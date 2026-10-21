@@ -1,0 +1,11 @@
+[Unit]
+Description=Save PF818 boot and network diagnostics to TF
+After=local-fs.target systemd-journald.service systemd-modules-load.service
+RequiresMountsFor=/boot
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/pf818-bootlog
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,5 @@
+#!/bin/sh
+set -e
+/usr/sbin/modprobe spidev
+printf spidev > /sys/bus/spi/devices/spi0.0/driver_override
+printf spi0.0 > /sys/bus/spi/drivers/spidev/bind

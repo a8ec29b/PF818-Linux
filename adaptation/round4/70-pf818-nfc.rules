@@ -1,0 +1,1 @@
+ACTION=="add", SUBSYSTEM=="spi", KERNEL=="spi0.0", ATTR{modalias}=="spi:pf818-nfc", RUN+="/usr/local/sbin/pf818-nfc-bind"

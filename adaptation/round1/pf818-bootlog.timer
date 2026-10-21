@@ -1,0 +1,10 @@
+[Unit]
+Description=Refresh PF818 boot and network diagnostics
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=60s
+Unit=pf818-bootlog.service
+
+[Install]
+WantedBy=timers.target

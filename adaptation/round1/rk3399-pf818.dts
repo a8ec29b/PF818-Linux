@@ -1,0 +1,154 @@
+// The included tree is extracted from the supplied ophub image by build_round1.py.
+/include/ "../../build/round1/sw799.dts"
+
+&{/} {
+    model = "Bozztek PF818 (SW799)";
+    compatible = "bozztek,pf818", "rockchip,rk3399-sw799", "rockchip,rk3399";
+
+    // Factory DT: GPIO0_A1 switches the TF card's 3.3 V supply.
+    pf818_vcc_sd: vcc-sd {
+        compatible = "regulator-fixed";
+        regulator-name = "vcc_sd";
+        regulator-min-microvolt = <3300000>;
+        regulator-max-microvolt = <3300000>;
+        gpio = <&{/pinctrl/gpio@ff720000} 1 0>;
+        enable-active-high;
+        regulator-boot-on;
+        regulator-always-on;
+        pinctrl-names = "default";
+        pinctrl-0 = <&pf818_sd_power>;
+        vin-supply = <&{/vcc3v3-sys}>;
+    };
+
+    // The factory bozztek,usb-power driver initializes usb-host1..8 high.
+    pf818-usb-host1 {
+        compatible = "regulator-fixed";
+        regulator-name = "pf818_usb_host1";
+        gpio = <&{/pinctrl/gpio@ff720000} 8 0>;
+        enable-active-high;
+        regulator-boot-on;
+        regulator-always-on;
+        pinctrl-names = "default";
+        pinctrl-0 = <&pf818_usb1>;
+    };
+    pf818-usb-host2 {
+        compatible = "regulator-fixed";
+        regulator-name = "pf818_usb_host2";
+        gpio = <&{/pinctrl/gpio@ff730000} 4 0>;
+        enable-active-high;
+        regulator-boot-on;
+        regulator-always-on;
+        pinctrl-names = "default";
+        pinctrl-0 = <&pf818_usb2>;
+    };
+    pf818-usb-host3 {
+        compatible = "regulator-fixed";
+        regulator-name = "pf818_usb_host3";
+        gpio = <&{/pinctrl/gpio@ff730000} 9 0>;
+        enable-active-high;
+        regulator-boot-on;
+        regulator-always-on;
+        pinctrl-names = "default";
+        pinctrl-0 = <&pf818_usb3>;
+    };
+    pf818-usb-host4 {
+        compatible = "regulator-fixed";
+        regulator-name = "pf818_usb_host4";
+        gpio = <&{/pinctrl/gpio@ff730000} 18 0>;
+        enable-active-high;
+        regulator-boot-on;
+        regulator-always-on;
+        pinctrl-names = "default";
+        pinctrl-0 = <&pf818_usb4>;
+    };
+    pf818-usb-host5 {
+        compatible = "regulator-fixed";
+        regulator-name = "pf818_usb_host5";
+        gpio = <&{/pinctrl/gpio@ff730000} 22 0>;
+        enable-active-high;
+        regulator-boot-on;
+        regulator-always-on;
+        pinctrl-names = "default";
+        pinctrl-0 = <&pf818_usb5>;
+    };
+    pf818-usb-host6 {
+        compatible = "regulator-fixed";
+        regulator-name = "pf818_usb_host6";
+        gpio = <&{/pinctrl/gpio@ff730000} 24 0>;
+        enable-active-high;
+        regulator-boot-on;
+        regulator-always-on;
+        pinctrl-names = "default";
+        pinctrl-0 = <&pf818_usb6>;
+    };
+    pf818-usb-host7 {
+        compatible = "regulator-fixed";
+        regulator-name = "pf818_usb_host7";
+        gpio = <&{/pinctrl/gpio@ff780000} 27 0>;
+        enable-active-high;
+        regulator-boot-on;
+        regulator-always-on;
+        pinctrl-names = "default";
+        pinctrl-0 = <&pf818_usb7>;
+    };
+    pf818-usb-host8 {
+        compatible = "regulator-fixed";
+        regulator-name = "pf818_usb_host8";
+        gpio = <&{/pinctrl/gpio@ff790000} 7 0>;
+        enable-active-high;
+        regulator-boot-on;
+        regulator-always-on;
+        pinctrl-names = "default";
+        pinctrl-0 = <&pf818_usb8>;
+    };
+};
+
+&{/pinctrl} {
+    pf818 {
+        pf818_sd_power: sd-power { rockchip,pins = <0 1 0 &{/pinctrl/pcfg-pull-up}>; };
+        pf818_usb1: usb1 { rockchip,pins = <0 8 0 &{/pinctrl/pcfg-pull-none}>; };
+        pf818_usb2: usb2 { rockchip,pins = <1 4 0 &{/pinctrl/pcfg-pull-none}>; };
+        pf818_usb3: usb3 { rockchip,pins = <1 9 0 &{/pinctrl/pcfg-pull-none}>; };
+        pf818_usb4: usb4 { rockchip,pins = <1 18 0 &{/pinctrl/pcfg-pull-none}>; };
+        pf818_usb5: usb5 { rockchip,pins = <1 22 0 &{/pinctrl/pcfg-pull-none}>; };
+        pf818_usb6: usb6 { rockchip,pins = <1 24 0 &{/pinctrl/pcfg-pull-none}>; };
+        pf818_usb7: usb7 { rockchip,pins = <2 27 0 &{/pinctrl/pcfg-pull-none}>; };
+        pf818_usb8: usb8 { rockchip,pins = <4 7 0 &{/pinctrl/pcfg-pull-none}>; };
+    };
+};
+
+&{/mmc@fe320000} {
+    status = "okay";
+    bus-width = <4>;
+    max-frequency = <50000000>;
+    cap-sd-highspeed;
+    disable-wp;
+    no-1-8-v;
+    vmmc-supply = <&pf818_vcc_sd>;
+    vqmmc-supply = <&{/i2c@ff3c0000/pmic@1b/regulators/LDO_REG4}>;
+    pinctrl-names = "default";
+    pinctrl-0 = <&{/pinctrl/sdmmc/sdmmc-bus4}
+                 &{/pinctrl/sdmmc/sdmmc-clk}
+                 &{/pinctrl/sdmmc/sdmmc-cmd}
+                 &{/pinctrl/sdmmc/sdmmc-cd}>;
+};
+
+&{/syscon@ff770000/io-domains} {
+    status = "okay";
+    sdmmc-supply = <&{/i2c@ff3c0000/pmic@1b/regulators/LDO_REG4}>;
+};
+
+&{/syscon@ff770000/usb2phy@e450/host-port} {
+    phy-supply = <&{/vcc5v0-sys}>;
+};
+&{/syscon@ff770000/usb2phy@e460/host-port} {
+    phy-supply = <&{/vcc5v0-sys}>;
+};
+
+// The PF818 factory tree disables GMAC and uses the Exar USB Ethernet device.
+&{/ethernet@fe300000} { status = "disabled"; };
+
+// These SW799 carrier-specific nodes overlap the PF818 USB power controls.
+&{/typec_power} { status = "disabled"; };
+&{/usb_power} { status = "disabled"; };
+&{/4g_module_power} { status = "disabled"; };

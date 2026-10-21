@@ -1,0 +1,127 @@
+/include/ "../round1/rk3399-pf818.dts"
+
+&{/} {
+    model = "Bozztek PF818 (SW799) R2";
+
+    // DSI0's factory backlight reference points to backlight2 / PWM1.
+    pf818_backlight: pf818-backlight {
+        compatible = "pwm-backlight";
+        pwms = <&{/pwm@ff420010} 0 500000 1>;
+        enable-gpios = <&{/pinctrl/gpio@ff790000} 29 0>;
+        brightness-levels = <0 16 32 64 96 128 160 192 224 255>;
+        default-brightness-level = <7>;
+        pinctrl-names = "default";
+        pinctrl-0 = <&pf818_backlight_enable>;
+    };
+
+    pf818-keys {
+        compatible = "gpio-keys";
+        pinctrl-names = "default";
+        pinctrl-0 = <&pf818_power_key>;
+        power {
+            label = "Power";
+            linux,code = <116>;
+            gpios = <&{/pinctrl/gpio@ff720000} 5 1>;
+            debounce-interval = <30>;
+            wakeup-source;
+        };
+    };
+
+    pf818-adc-keys {
+        compatible = "adc-keys";
+        io-channels = <&{/saradc@ff100000} 1>;
+        io-channel-names = "buttons";
+        keyup-threshold-microvolt = <1800000>;
+        poll-interval = <100>;
+        // Factory ADC values, scaled from 10-bit samples with a 1.8 V reference.
+        volume-up { label = "Volume Up"; linux,code = <115>; press-threshold-microvolt = <313196>; };
+        home { label = "Home"; linux,code = <102>; press-threshold-microvolt = <8798>; };
+        volume-down { label = "Volume Down"; linux,code = <114>; press-threshold-microvolt = <927273>; };
+        right { label = "Right"; linux,code = <106>; press-threshold-microvolt = <635191>; };
+        menu { label = "Menu"; linux,code = <59>; press-threshold-microvolt = <1226393>; };
+    };
+};
+
+&{/pinctrl} {
+    pf818-display {
+        pf818_lcd_enable: lcd-enable {
+            rockchip,pins = <4 5 0 &{/pinctrl/pcfg-pull-none}>;
+        };
+        pf818_lcd_reset: lcd-reset {
+            rockchip,pins = <4 30 0 &{/pinctrl/pcfg-pull-none}>;
+        };
+        pf818_backlight_enable: backlight-enable {
+            rockchip,pins = <4 29 0 &{/pinctrl/pcfg-pull-none}>;
+        };
+    };
+    pf818-input {
+        pf818_power_key: power-key {
+            rockchip,pins = <0 5 0 &{/pinctrl/pcfg-pull-up}>;
+        };
+        pf818_touch_irq: touch-irq {
+            rockchip,pins = <2 3 0 &{/pinctrl/pcfg-pull-up}>;
+        };
+        pf818_touch_reset: touch-reset {
+            rockchip,pins = <2 4 0 &{/pinctrl/pcfg-pull-none}>;
+        };
+    };
+};
+
+&{/saradc@ff100000} {
+    status = "okay";
+    vref-supply = <&{/i2c@ff3c0000/pmic@1b/regulators/DCDC_REG4}>;
+};
+
+&{/i2c@ff160000} {
+    status = "okay";
+    clock-frequency = <100000>;
+    touchscreen@5d {
+        compatible = "goodix,gt911";
+        reg = <0x5d>;
+        interrupt-parent = <&{/pinctrl/gpio@ff780000}>;
+        interrupts = <3 2>;
+        irq-gpios = <&{/pinctrl/gpio@ff780000} 3 0>;
+        reset-gpios = <&{/pinctrl/gpio@ff780000} 4 0>;
+        AVDD28-supply = <&{/i2c@ff3c0000/pmic@1b/regulators/LDO_REG2}>;
+        VDDIO-supply = <&{/i2c@ff3c0000/pmic@1b/regulators/LDO_REG3}>;
+        pinctrl-names = "default";
+        pinctrl-0 = <&pf818_touch_irq &pf818_touch_reset>;
+        touchscreen-size-x = <1200>;
+        touchscreen-size-y = <1920>;
+    };
+};
+
+&{/pwm@ff420010} { status = "okay"; };
+&{/vop@ff900000} { status = "okay"; };
+&{/iommu@ff903f00} { status = "okay"; };
+&{/display-subsystem} { status = "okay"; };
+
+&{/dsi@ff960000} {
+    status = "okay";
+    #address-cells = <1>;
+    #size-cells = <0>;
+
+    panel@0 {
+        compatible = "bozztek,pf818-m08";
+        reg = <0>;
+        enable-gpios = <&{/pinctrl/gpio@ff790000} 5 0>;
+        reset-gpios = <&{/pinctrl/gpio@ff790000} 30 1>;
+        backlight = <&pf818_backlight>;
+        pinctrl-names = "default";
+        pinctrl-0 = <&pf818_lcd_enable &pf818_lcd_reset>;
+
+        port {
+            pf818_panel_in: endpoint {
+                remote-endpoint = <&pf818_dsi_out>;
+            };
+        };
+    };
+};
+
+&{/dsi@ff960000/ports/port@1} {
+    pf818_dsi_out: endpoint {
+        remote-endpoint = <&pf818_panel_in>;
+    };
+};
+&{/dsi@ff960000/ports/port@0/endpoint@1} { status = "disabled"; };
+&{/vop@ff8f0000/port/endpoint@2} { status = "disabled"; };

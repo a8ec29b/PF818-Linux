@@ -1,0 +1,23 @@
+/include/ "../round3/rk3399-pf818-r3.dts"
+
+&{/} { model = "Bozztek PF818 (SW799) R4"; };
+
+&{/spi@ff1c0000} {
+    status = "okay";
+
+    nfc@0 {
+        compatible = "bozztek,pf818-nfc";
+        reg = <0>;
+        spi-max-frequency = <1000000>;
+    };
+};
+
+&{/pinctrl/gpio@ff788000} {
+    // GPIO3_B2 is PDOWN: physical low keeps the factory reader active.
+    nfc-pdown {
+        gpio-hog;
+        gpios = <10 0>;
+        output-low;
+        line-name = "pf818-nfc-active";
+    };
+};

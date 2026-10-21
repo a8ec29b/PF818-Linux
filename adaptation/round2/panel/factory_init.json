@@ -1,0 +1,7 @@
+{
+  "source": "factory Android runtime DTB",
+  "node": "/dsi@ff960000/panel@0/mipi0_lcd_07",
+  "bytes": 538,
+  "commands": 108,
+  "sha256": "b1e82f59c0758ccee8d6334961611ab0c8af7c697f4eb71067e0a1477c4687c8"
+}

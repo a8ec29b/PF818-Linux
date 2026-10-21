@@ -1,0 +1,25 @@
+#!/bin/sh
+# Keep diagnostics on the TF boot partition for collection after power-off.
+logdir=/boot/pf818-logs/$(cat /proc/sys/kernel/random/boot_id)
+mkdir -p "$logdir"
+dmesg >"$logdir/dmesg.txt"
+journalctl -b -n 1500 --no-pager -o short-monotonic >"$logdir/journal.txt"
+{
+    date -Is
+    uname -a
+    cat /proc/cmdline
+    cat /proc/device-tree/model
+    echo
+    findmnt --target /
+    findmnt --target /boot
+    lsblk -o NAME,SIZE,FSTYPE,UUID,MOUNTPOINTS
+    ip -br link
+    ip -br address
+    ip route
+    nmcli device status
+    nmcli connection show
+    lsusb
+    gpioinfo
+    systemctl --failed --no-pager
+} >"$logdir/status.txt" 2>&1
+sync -f /boot

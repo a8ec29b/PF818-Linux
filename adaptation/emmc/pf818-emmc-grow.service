@@ -1,0 +1,14 @@
+[Unit]
+Description=Expand PF818 eMMC root partition and filesystem
+After=local-fs.target
+ConditionPathExists=!/var/lib/pf818/emmc-expanded
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/pf818-emmc-grow
+StateDirectory=pf818
+TimeoutStartSec=6min
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

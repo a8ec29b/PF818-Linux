@@ -1,0 +1,47 @@
+/include/ "../round2/rk3399-pf818-r2.dts"
+
+&{/} { model = "Bozztek PF818 (SW799) R3"; };
+
+// Factory init.rk30board.rc exports GPIO33 and drives it high for the modem.
+&{/4g_module_power} {
+    status = "okay";
+    regulator-boot-on;
+    pinctrl-0 = <&pf818_ec20_power>;
+};
+
+&{/pinctrl} {
+    pf818-wireless {
+        pf818_ec20_power: ec20-power {
+            rockchip,pins = <1 1 0 &{/pinctrl/pcfg-pull-none}>;
+        };
+        pf818_bt_shutdown: bt-shutdown {
+            rockchip,pins = <0 9 0 &{/pinctrl/pcfg-pull-none}>;
+        };
+        pf818_bt_device_wake: bt-device-wake {
+            rockchip,pins = <2 26 0 &{/pinctrl/pcfg-pull-none}>;
+        };
+        pf818_bt_host_wake: bt-host-wake {
+            rockchip,pins = <0 4 0 &{/pinctrl/pcfg-pull-none}>;
+        };
+    };
+};
+
+&{/serial@ff180000} {
+    status = "okay";
+    pinctrl-0 = <&{/pinctrl/uart0/uart0-xfer}
+                 &{/pinctrl/uart0/uart0-cts}
+                 &{/pinctrl/uart0/uart0-rts}>;
+    uart-has-rtscts;
+
+    bluetooth {
+        compatible = "brcm,bcm43438-bt";
+        max-speed = <1500000>;
+        clocks = <&{/i2c@ff3c0000/pmic@1b} 1>;
+        clock-names = "lpo";
+        shutdown-gpios = <&{/pinctrl/gpio@ff720000} 9 0>;
+        device-wakeup-gpios = <&{/pinctrl/gpio@ff780000} 26 0>;
+        host-wakeup-gpios = <&{/pinctrl/gpio@ff720000} 4 0>;
+        pinctrl-names = "default";
+        pinctrl-0 = <&pf818_bt_shutdown &pf818_bt_device_wake &pf818_bt_host_wake>;
+    };
+};
