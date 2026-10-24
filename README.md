@@ -33,7 +33,27 @@ PF818 收银终端的 Linux 外设适配源码，硬件采用 Rockchip RK3399 / 
 
 内屏保留默认背光设置。实机观察到屏幕附近持续发热，关闭背光后等待约十分钟明显降温；尚未确认具体发热元件。横屏配置用于文本登录，图形桌面的旋转及触摸坐标映射需要另行配置。
 
-## 源码与打包
+## 下载镜像与获取源码
+
+**可烧录镜像通过当前仓库的 Releases 附件分发，Git 源码仓库不包含镜像。** 安装已发布的系统无需克隆仓库，也不需要自行构建；请在仓库页面打开 **Releases**，选择同一个版本的附件：
+
+| 附件 | 用途 |
+| --- | --- |
+| `PF818_R5_TF_*.img.gz` | 写入 TF 卡，用来启动 Linux 和安装/恢复机内系统 |
+| `PF818_R5_EMMC_*.img.gz` | 在 TF 启动的 Linux 中写入 eMMC |
+| 与镜像同名的 `.img.gz.sha256` | 校验下载的压缩包 |
+| 与镜像同名的 `.img.sha256` | 校验解压后的镜像或写入内容 |
+| 与镜像同名前缀的 `.json` | 查看来源、大小、UUID 和构建验证结果 |
+
+星号代表 Release 附件中的实际版本、内核和时间戳。安装 eMMC 时请同时下载其 `.img.gz`、`.img.gz.sha256` 和 `.img.sha256`，放在同一目录。每个目录只放同一个 Release 的一套附件，避免下面的文件匹配选中多个版本。GitHub 自动生成的 **Source code** 压缩包是源码，不是可烧录镜像。
+
+镜像解压后为 `.img`，约 **2577 MiB**，BOOT 128 MiB、ROOTFS 2432 MiB，可用 balenaEtcher 写入至少 4GB 的 TF 卡，首次启动保持固定分区。eMMC 版仅在识别到根文件系统来自 eMMC 时扩容第二分区及 ext4。实际文件名、大小和校验值以所选 Release 的附件为准。
+
+镜像继承基础系统登录账户 `root` / `1234`，有线 DHCP，首次使用应修改密码。Wi-Fi 由使用者配置。
+
+### 自行构建
+
+需要修改适配或重新打包时，再获取本仓库源码并阅读 [BUILDING.md](BUILDING.md)。源码目录如下：
 
 - `adaptation/round1/`：TF、USB 供电、有线网络及启动日志。
 - `adaptation/round2/`：屏幕模块、初始化序列、触摸、按键和横屏登录。
@@ -43,24 +63,11 @@ PF818 收银终端的 Linux 外设适配源码，硬件采用 Rockchip RK3399 / 
 - `adaptation/emmc/`：eMMC 首次启动扩容脚本和服务。
 - `adaptation/build_*.py`：离线镜像打包脚本，使用 `debugfs` 编辑文件系统。
 
-完整准备步骤见 [BUILDING.md](BUILDING.md)。仓库仅保存适配源码与配置；上游镜像、内核、deb、模块成品和原厂 NFC 共享库需自行取得。
+`build/` 和 `output/` 都是构建者本地生成、被 Git 忽略的目录，克隆源码后不会自带这些内容。构建者可用 `--gzip-only --cleanup` 只保留验证后的压缩成品和元数据，再将需要分发的文件单独上传至 Release；安装者直接使用 Release 下载文件即可。
 
-R5 可直接从已有 R4 TF / eMMC 镜像派生，不需要重走 R1–R4。使用方法见 [USAGE.md](USAGE.md)，烧录和升级见 [INSTALLING.md](INSTALLING.md)，变化见 [CHANGELOG.md](CHANGELOG.md)。
+R5 可直接从已有 R4 TF / eMMC 镜像派生，不需要重走 R1–R4。上游镜像、内核、deb、模块成品和原厂 NFC 共享库需自行取得。程序调用见 [USAGE.md](USAGE.md)，变化见 [CHANGELOG.md](CHANGELOG.md)。
 
-镜像解压后为 `.img`，约 **2577 MiB**，BOOT 128 MiB、ROOTFS 2432 MiB，可用 balenaEtcher 写入 4GB TF 卡，首次启动保持固定分区。eMMC 镜像从同一 R4 派生，仅在识别到根文件系统来自 eMMC 时扩容第二分区及 ext4。文件名带打包时间，精确到分钟，同时生成 SHA-256 和 JSON 清单。
-
-本次重新打包采用 `--gzip-only --cleanup`：`output/` 只保留 TF/eMMC 两份 `.img.gz`、压缩包与原始镜像的 SHA-256、JSON 清单，不保留多份 2.5GiB 的未压缩镜像。压缩包解压读回哈希通过后才删除对应 `.img`；整轮构建成功后删除本轮生成的临时 `.img`，原厂安卓备份和输入 R4 包保留。
-
-本次更新后的成品在 `output/`：
-
-- TF 启动版：`PF818_R5_TF_Armbian_trixie_6.18.57_2026-10-24_2128.img.gz`。
-- eMMC 安装版：`PF818_R5_EMMC_Armbian_trixie_6.18.57_2026-10-24_2128.img.gz`。
-
-每份约 797MiB，旁边保留 `.img.gz.sha256`、`.img.sha256` 和 `.json`。其中 `.img.sha256` 用于解压后镜像或写入内容的校验，不代表目录中还保留了未压缩的 `.img`。
-
-镜像继承基础系统登录账户 `root` / `1234`，有线 DHCP，首次使用应修改密码。Wi-Fi 由使用者配置。
-
-R4 已在 TF 实机验证。此 R4 eMMC 派生镜像完成了离线启动文件复用、文件系统、GPT 及扩容模拟校验；该具体内核与配置组合尚未进行 eMMC 独立启动实测。写入 eMMC 会覆盖原系统，需要自行保存完整原厂备份并确认恢复入口。仓库脚本只生成本地镜像，不自动写设备。
+R4 已在 TF 实机验证。此 R4 eMMC 派生镜像完成了离线启动文件复用、文件系统、GPT 及扩容模拟校验；该具体内核与配置组合尚未进行 eMMC 独立启动实测。写入 eMMC 会覆盖原系统，操作前应准备可用的样机安卓恢复附件或自备整盘备份，并确认恢复入口。仓库脚本只生成本地镜像，不自动写设备。
 
 ## R5 的扫码器、指示灯与补光调用
 
@@ -130,41 +137,33 @@ LED 支持复用现有内核内建的 `CONFIG_LEDS_GPIO=y` 与 timer trigger，�
 | 要做的事 | 从哪里启动 | 写入哪个文件 | 写到哪里 |
 | --- | --- | --- | --- |
 | 把 R5 Linux 安装到机内 | R5 TF 版 | `PF818_R5_EMMC_*.img.gz` | eMMC 整盘 |
-| 将机内系统恢复为安卓 | Linux TF 卡 | `PF818_Stock_Android_7.1.2_EMMC_2026-10-21_1159.img.gz` | eMMC 整盘 |
+| 将机内系统恢复为安卓 | Linux TF 卡 | Release 提供的样机安卓整盘备份，或自备整盘原始备份 `.img.gz` | eMMC 整盘 |
 
 若始终只从 TF 卡运行 Linux，未写过 eMMC，**关机、拔卡、重新开机就能回到原来的安卓**，不需要执行恢复写入。
 
-以下命令使用本次生成的 R5 文件名。使用其他构建版本时，替换对应的文件名及校验文件。**本文的实际写入目标由 TF 系统动态识别，不按安卓里的 `mmcblk1` 编号硬编码。**
+以下步骤适用于使用 Windows、macOS 或 Linux 电脑下载附件的读者。准备文件可用文件管理器完成；进入 TF 后的刷写命令统一在 **PF818 的 Linux Bash** 中执行。**路径占位符需换成你自己的实际路径；不要求与开发者相同的电脑目录。eMMC 编号和镜像长度从实际设备及文件读取，样机备份的已知校验值只用于对应的恢复附件。**
 
 ### 一、准备 TF 卡和存放镜像的 U 盘
 
-1. 准备至少 4GB TF 卡，用于启动 Linux；另准备至少 4GB、使用 FAT32 或 exFAT 文件系统的 U 盘，用于存放压缩镜像。如需用 Mac 磁盘工具更改 U 盘格式，先保存 U 盘现有数据。
-2. 用 balenaEtcher 将 `PF818_R5_TF_Armbian_trixie_6.18.57_2026-10-24_2128.img` 写入 TF 卡，并等待验证完成。若只有 `.img.gz`，先解压得到 `.img`。
-3. 将 U 盘卷标设为 `PF818`，下面统一从该卷标挂载。已有 U 盘可直接改卷标，无需为了这些步骤重新格式化。
-4. 在 Mac 上把安装/恢复文件复制到 U 盘。以下代码在 **Mac 终端** 执行；如果 U 盘卷名或本地目录不同，只修改开头三个变量：
+1. 从所选 Release 下载 TF 版、eMMC 版及对应校验文件。
+2. 准备至少 4GB TF 卡，用于启动 Linux；另准备容量足够的 U 盘，用于存放 eMMC 安装包或安卓恢复备份。R5 安装包可使用至少 4GB 的 U 盘，安卓备份按其实际大小准备空间。U 盘使用 Linux 可读取的 FAT32 或 exFAT；单文件超过 4GiB 时使用 exFAT。更改格式会清空 U 盘，先保存其中的数据。
+3. 解压 TF 版 `.img.gz` 得到 `.img`，用 balenaEtcher 选择该 `.img` 和 TF 卡，完成写入及验证。
+4. 在 U 盘根目录新建 `pf818` 文件夹，将 eMMC 版 `.img.gz`、同名 `.img.gz.sha256`、`.img.sha256`（以及可选 `.json`）复制进去。U 盘无需特定卷标。
+5. 若要恢复安卓，从 Release 下载发布者提供的样机安卓整盘备份 `PF818_Stock_Android_*.img.gz`，放入同一个文件夹；若附件提供了校验文件，也一起复制。也可以使用自行保存的完整备份，不要求每位使用者都先制作自己的备份。恢复文件仍需单独下载，源码压缩包和 R5 Linux 镜像都不包含安卓恢复数据；厂商升级包不等同于整盘原始备份。
+
+上面的复制步骤在所有电脑上都可使用文件管理器完成。若使用 Linux/macOS 终端，下面是等价示例；两个 `/path/to/...` 都是需要替换的路径，不要求任何固定的用户名、下载目录或仓库位置：
 
 ```bash
-PF818_REPO="$HOME/GitHubRepo/PF818-Linux"
-PF818_STOCK="$HOME/Downloads/pf818原包文件夹"
-PF818_USB="/Volumes/PF818"
+DOWNLOAD_DIR="/path/to/release-downloads"  # 所选 Release 附件的本地下载目录
+USB_DIR="/path/to/usb-mountpoint"         # 电脑上 U 盘的实际挂载目录
 
-# 确认 U 盘已挂载，再创建存放镜像的目录。
-test -d "$PF818_USB" || { echo "没有找到 U 盘：$PF818_USB"; exit 1; }
-mkdir -p "$PF818_USB/pf818"
-
-# R5 eMMC 安装包，以及压缩包/解压后镜像的校验文件。
-cp "$PF818_REPO/output/PF818_R5_EMMC_Armbian_trixie_6.18.57_2026-10-24_2128.img.gz" \
-   "$PF818_USB/pf818/"
-cp "$PF818_REPO/output/PF818_R5_EMMC_Armbian_trixie_6.18.57_2026-10-24_2128.img.gz.sha256" \
-   "$PF818_USB/pf818/"
-cp "$PF818_REPO/output/PF818_R5_EMMC_Armbian_trixie_6.18.57_2026-10-24_2128.img.sha256" \
-   "$PF818_USB/pf818/"
-
-# 安卓整盘备份，以及额外保存的两个硬件启动区备份。
-cp "$PF818_STOCK/PF818_Stock_Android_7.1.2_EMMC_2026-10-21_1159.img.gz" \
-   "$PF818_USB/pf818/"
-cp "$PF818_STOCK/emmc-boot0.img" "$PF818_STOCK/emmc-boot1.img" \
-   "$PF818_USB/pf818/"
+test -d "$DOWNLOAD_DIR"
+test -d "$USB_DIR"
+mkdir -p "$USB_DIR/pf818"
+cp "$DOWNLOAD_DIR"/PF818_R5_EMMC_*.img.gz \
+   "$DOWNLOAD_DIR"/PF818_R5_EMMC_*.img.gz.sha256 \
+   "$DOWNLOAD_DIR"/PF818_R5_EMMC_*.img.sha256 \
+   "$USB_DIR/pf818/"
 sync
 ```
 
@@ -174,7 +173,7 @@ sync
 
 #### 1. 从 TF 启动，进入 root Bash
 
-PF818 关机，插入已写好的 TF 卡及 U 盘，再开机进入 Armbian。以下命令全部在 **PF818 的 TF Linux 终端或它的 SSH 会话中** 执行，不是在 Mac 本机执行。
+PF818 关机，插入已写好的 TF 卡及 U 盘，再开机进入 Armbian。以下命令全部在 **PF818 的 TF Linux 终端或它的 SSH 会话中** 执行，不是在用于下载附件的电脑上执行。
 
 基础账户为 `root`，初始密码 `1234`。普通用户先执行：
 
@@ -230,7 +229,7 @@ printf '当前 TF 根分区：%s\n目标 eMMC：%s\n目标容量：%s 字节\n' 
 lsblk -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINTS "$EMMC_DEV"
 ```
 
-本机 eMMC 容量为 **15,634,268,160 字节**。核对输出，确认根系统所在 TF 与目标 eMMC 是不同设备。后续代码使用上面设置的 `EMMC_DEV`；若换了终端或重新登录，需重新执行公共准备。
+容量以你的设备实际输出为准。核对输出，确认根系统所在 TF 与目标 eMMC 是不同设备。后续代码使用上面设置的 `EMMC_DEV`；若换了终端或重新登录，需重新执行公共准备。
 
 #### 3. 卸载 eMMC 上正在使用的分区
 
@@ -257,9 +256,19 @@ lsblk -o NAME,SIZE,TYPE,MOUNTPOINTS "$EMMC_DEV"
 
 #### 4. 挂载存放镜像的 U 盘
 
+用 `lsblk` 查看刚插入的 USB 存储分区，按容量、文件系统和 `TRAN` 列区分 U 盘与两种 MMC 介质。将下面的 `/dev/sdX1` 替换为**实际 U 盘分区**，不要求它固定为 `/dev/sda1`，也不要求特定卷标：
+
 ```bash
-USB_PART="$(readlink -f /dev/disk/by-label/PF818)"
-test -b "$USB_PART" || { echo "未找到卷标为 PF818 的 U 盘"; exit 1; }
+lsblk -o NAME,SIZE,TYPE,TRAN,FSTYPE,LABEL,MOUNTPOINTS
+USB_PART="/dev/sdX1"  # 按上面的输出替换
+USB_PART="$(readlink -f "$USB_PART")"
+test -b "$USB_PART" || { echo "没有找到指定的 U 盘分区"; exit 1; }
+case "$USB_PART" in
+    "$EMMC_DEV"|"$EMMC_DEV"p[0-9]*)
+        echo "镜像不能存放在即将覆盖的 eMMC 上。"
+        exit 1
+        ;;
+esac
 
 # 如果已经自动挂载，复用其挂载点；否则以只读方式挂载。
 USB_MOUNT="$(findmnt -n -o TARGET -S "$USB_PART" || true)"
@@ -283,15 +292,21 @@ ls -lh "$IMAGE_DIR"
 #### 1. 检查 R5 安装包
 
 ```bash
-LINUX_IMAGE="PF818_R5_EMMC_Armbian_trixie_6.18.57_2026-10-24_2128.img.gz"
-LINUX_RAW_SUM="PF818_R5_EMMC_Armbian_trixie_6.18.57_2026-10-24_2128.img.sha256"
-LINUX_BYTES=2702180352
-
-test "$EMMC_BYTES" -ge "$LINUX_BYTES"
 cd "$IMAGE_DIR"
+LINUX_FILES=(PF818_R5_EMMC_*.img.gz)
+if [ "${#LINUX_FILES[@]}" -ne 1 ] || [ ! -f "${LINUX_FILES[0]}" ]; then
+    echo "请在此目录只保留所选 Release 的一份 R5 eMMC 压缩镜像。"
+    exit 1
+fi
+LINUX_IMAGE="${LINUX_FILES[0]}"
+LINUX_RAW_SUM="${LINUX_IMAGE%.gz}.sha256"
+
 sha256sum -c "$LINUX_IMAGE.sha256"
-gzip -t "$LINUX_IMAGE"
 test -f "$LINUX_RAW_SUM"
+LINUX_BYTES="$(gzip -dc "$LINUX_IMAGE" | wc -c | tr -d '[:space:]')"
+test "$LINUX_BYTES" -gt 0
+test "$EMMC_BYTES" -ge "$LINUX_BYTES"
+printf '安装镜像：%s\n解压后长度：%s 字节\n' "$LINUX_IMAGE" "$LINUX_BYTES"
 ```
 
 应看到校验结果 `OK`。使用的是 **EMMC 版**，TF 版继续留在卡上作为启动与恢复环境。
@@ -307,7 +322,7 @@ gzip -dc "$IMAGE_DIR/$LINUX_IMAGE" | \
 sync
 ```
 
-等待整个命令成功退出。本次镜像应写入 `2702180352` 字节，约 2.5GiB。`EMMC_DEV` 指整盘，不是末尾带 `p1`、`p2` 的分区。
+等待整个命令成功退出，写入字节数应等于上一步统计的 `LINUX_BYTES`。统计及写入均采用流式解压，不会把完整 `.img` 保存到 TF 根分区。`EMMC_DEV` 指整盘，不是末尾带 `p1`、`p2` 的分区。
 
 #### 3. 校验写入内容
 
@@ -348,26 +363,53 @@ pf818-scan --once --timeout 30
 
 #### 1. 检查原厂备份和目标容量
 
-本机备份已做过只读核对：gzip 完整性通过，解压后大小与整块 eMMC 一致，U-Boot/trust 与当前安卓对应区域一致。备份文件和已知解压后哈希如下：
+可以使用 Release 提供的样机安卓 eMMC 用户区整盘原始备份，也可以使用自备的同类 `.img.gz` 文件。下面默认使用项目的样机备份文件名；若选用其他文件，只修改 `ANDROID_IMAGE`。厂商升级包不适用这些整盘写入命令。
+
+项目样机备份 `PF818_Stock_Android_7.1.2_EMMC_2026-10-21_1159.img.gz` 已核对：解压后 **15,634,268,160 字节**，原始镜像 SHA-256 为 `08bc74ae677abdfc928faaab123dee939b6704a0dbc40fe81283c4dda595bb0b`。这些值对应这一份发布附件，不是电脑路径或所有备份的通用参数。
+
+先校验备份（若附有原先保存的同名 `.sha256` 文件），再流式读取解压后的长度及 SHA-256。此过程不将完整原始镜像保存到 TF 卡：
 
 ```bash
 ANDROID_IMAGE="PF818_Stock_Android_7.1.2_EMMC_2026-10-21_1159.img.gz"
-ANDROID_BYTES=15634268160
-EXPECTED_ANDROID_SHA="08bc74ae677abdfc928faaab123dee939b6704a0dbc40fe81283c4dda595bb0b"
-
-if [ "$EMMC_BYTES" -ne "$ANDROID_BYTES" ]; then
-    echo "目标容量与本机整盘备份不一致，停止恢复。"
-    exit 1
+# 若使用其他整盘原始备份，将上面的值改成实际文件名。
+cd "$IMAGE_DIR"
+test -f "$ANDROID_IMAGE"
+if [ -f "$ANDROID_IMAGE.sha256" ]; then
+    sha256sum -c "$ANDROID_IMAGE.sha256"
 fi
 
-gzip -t "$IMAGE_DIR/$ANDROID_IMAGE"
-BACKUP_ANDROID_SHA="$(gzip -dc "$IMAGE_DIR/$ANDROID_IMAGE" | sha256sum | awk '{print $1}')"
-printf '已知备份哈希：%s\n当前文件哈希：%s\n' "$EXPECTED_ANDROID_SHA" "$BACKUP_ANDROID_SHA"
-test "$BACKUP_ANDROID_SHA" = "$EXPECTED_ANDROID_SHA"
-echo "安卓备份校验通过。"
+python3 - "$ANDROID_IMAGE" > /tmp/pf818-android-restore-meta.txt <<'PY'
+import gzip
+import hashlib
+import sys
+
+size = 0
+digest = hashlib.sha256()
+with gzip.open(sys.argv[1], "rb") as backup:
+    while chunk := backup.read(16 * 1024 * 1024):
+        size += len(chunk)
+        digest.update(chunk)
+print(size, digest.hexdigest())
+PY
+
+read -r ANDROID_BYTES EXPECTED_ANDROID_SHA < /tmp/pf818-android-restore-meta.txt
+printf '备份解压后长度：%s 字节\n备份 SHA-256：%s\n' \
+    "$ANDROID_BYTES" "$EXPECTED_ANDROID_SHA"
+
+# 使用项目样机附件时，与已核对的发布数据比较。
+if [ "$ANDROID_IMAGE" = "PF818_Stock_Android_7.1.2_EMMC_2026-10-21_1159.img.gz" ]; then
+    test "$ANDROID_BYTES" -eq 15634268160
+    test "$EXPECTED_ANDROID_SHA" = "08bc74ae677abdfc928faaab123dee939b6704a0dbc40fe81283c4dda595bb0b"
+fi
+
+if [ "$EMMC_BYTES" -ne "$ANDROID_BYTES" ]; then
+    echo "目标容量与整盘备份不一致，停止恢复。"
+    exit 1
+fi
+echo "备份读取完整，容量匹配。"
 ```
 
-此哈希只对应上述这份本机备份。若另行制作了更新的备份，应使用那份备份自己的大小和哈希，不能套用这里的值。
+`EXPECTED_ANDROID_SHA` 用于下一步与写入后的整块 eMMC 比较；它表示当前选定备份的内容，不是对任意备份来源或适用机型的保证。
 
 #### 2. 将安卓整盘备份完整写回 eMMC
 
@@ -380,7 +422,7 @@ gzip -dc "$IMAGE_DIR/$ANDROID_IMAGE" | \
 sync
 ```
 
-等待整个命令成功退出，写入量应为 **`15634268160` 字节**。由于是完整写回同一容量的 eMMC，原有 Linux 分区信息也会被覆盖。
+等待整个命令成功退出，写入量应等于上一步统计的 **`ANDROID_BYTES`**。由于是完整写回同一容量的 eMMC，原有 Linux 分区信息也会被覆盖。
 
 #### 3. 校验整块 eMMC
 
@@ -402,11 +444,11 @@ poweroff
 
 #### 4. boot0、boot1 是否需要刷回
 
-本机 `emmc-boot0.img`、`emmc-boot1.img` 各 4MiB，均为全零，已与当前真机对应区域逐字节核对一致。本文的 R5 安装只写 eMMC 用户区，未修改这两个硬件启动区或 eMMC 启动配置，**因此按这套安装方法刷过 R5 后，恢复安卓时无需写 boot0、boot1**。继续保存这两个备份文件即可。安卓名为 `boot` 的系统分区已经包含在主备份中，不是这两个硬件启动区。
+eMMC 的 `boot0`、`boot1` 是独立硬件启动区，不是安卓名为 `boot` 的系统分区；后者包含在主备份中。本文的 R5 安装只写 eMMC 用户区，未修改硬件启动区或启动配置，**若你也没有另行改动它们，按本文路线恢复时无需写 boot0、boot1**。仍应保存自己设备的这些额外备份；其他设备或曾改动过硬件启动区的情况，需按其实际备份和启动配置处理，不能假定它们全为零。
 
 ### 五、当前验证范围与恢复入口
 
-截至本次交付，已完成扫码器的安卓真机接口验证、三路灯的安卓真机点亮及位置确认、R5 镜像离线检查，以及安卓备份完整性/容量/关键引导区域核对。**R5 TF 冷启动、灯控与扫码的 Armbian 启动后验证、eMMC 安装/独立启动、实际安卓回刷启动尚未执行验收。** 本文提供操作步骤，不代表已经在本机完成过一次刷入及刷回测试。
+项目当前已完成开发样机上的扫码器安卓接口验证、三路灯点亮及位置确认、R5 镜像离线检查，以及样机安卓恢复附件的完整性/容量/关键引导区域核对。**R5 TF 冷启动、灯控与扫码的 Armbian 启动后验证、eMMC 安装/独立启动、实际安卓回刷启动尚未执行验收。** 下载后仍按上面的命令检查附件和写入内容。
 
 如果 TF 卡也无法启动，需要转用 Rockchip Loader / MaskROM USB 恢复。PF818 的具体恢复入口及匹配的 DDR/USB Loader 目前尚未验证；该路径不在上面的 TF 恢复命令中。相关文件说明见 [RESTORING_ANDROID.md](RESTORING_ANDROID.md)，驱动和工具来源见 [NOTICE.md](NOTICE.md)。
 
