@@ -152,7 +152,37 @@ python3 adaptation/round5/test_lights.py
 
 注意：本机编译的测试程序与 ARM64 镜像载荷使用不同输出文件名。
 
-## 6. 旧版 R4 eMMC 派生镜像
+## 6. 大卡 Live 安装版（16GB 及以上）
+
+标准 TF/eMMC 成品保留不变。另运行 `adaptation/build_live.py`，从已生成的 R5 TF 镜像派生大卡版，内置现有的 R5 eMMC 压缩镜像和样机安卓整盘备份。
+
+需要 Python 3.11+、e2fsprogs 的 `debugfs` / `e2fsck` / `tune2fs` / `resize2fs`，以及支持 `openssl passwd -6` 的 OpenSSL。macOS 系统自带 LibreSSL 可能不支持 `-6`，可通过 `--openssl /path/to/openssl` 明确选择 OpenSSL。构建期间推荐预留至少约 25GB 临时空间。
+
+输入的 R5 TF 与 eMMC `.img.gz` 各自都需保留旁边的同名前缀 `.json`。命令中的路径自行替换：
+
+```sh
+python3 adaptation/build_live.py \
+  --tf-image /path/to/PF818_R5_TF_VERSION.img.gz \
+  --linux-image /path/to/PF818_R5_EMMC_VERSION.img.gz \
+  --android-backup /path/to/PF818_Stock_Android_7.1.2_EMMC_2026-10-21_1159.img.gz
+```
+
+输出为单个 `PF818_R5_LIVE_16GB_*.img.gz`，约 2.7GiB，不分片，另生成压缩包/原始镜像的 SHA-256 和 JSON 清单。成功后删除本轮大体积临时镜像与未压缩成品；输入包及原有小卡版均保留。此大包由发布者通过 OneDrive 分发，不作为 GitHub Release 的大附件上传。
+
+大卡镜像的根文件系统扩为 8GiB，主备 GPT 调整为新布局并生成独立 GUID，文件系统也使用新的 UUID。完整镜像解压后约 8.14GiB，因此推荐至少 16GB 卡。其余卡空间不自动扩展。
+
+构建会将两份压缩包及长度/哈希清单放到 `/opt/pf818-installer/`，安装 `/usr/local/sbin/pf818-install` 及登录环境脚本。Live 版设置 root 密码为 1234、清除强制改密/首次用户设置入口；首次交互登录显示中英双语命令和 `passwd` 提醒。首次启动生成独立 SSH 主机密钥。有线 DHCP 的设备名为 `pf818-live`。
+
+检查安装器和 GPT 处理逻辑（只操作临时普通文件，不写物理盘）：
+
+```sh
+python3 adaptation/live/test_installer.py
+python3 adaptation/live/test_gpt.py
+```
+
+离线构建还验证内置包逐文件读回、root 登录设置、SSH/keygen 启用、启动 UUID 配置、原有 R5 内核/initramfs/DTB/屏幕/NFC/扫码/灯控文件保留，以及压缩包解压读回哈希。实际 TF 冷启动及真实 eMMC 安装/恢复仍需设备验收。
+
+## 7. 旧版 R4 eMMC 派生镜像
 
 R4 `.img` 和旁边的 `.json` 清单都需保留。
 

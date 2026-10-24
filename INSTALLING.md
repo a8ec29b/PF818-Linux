@@ -1,6 +1,17 @@
 # TF 启动与 eMMC 安装
 
-安装已发布镜像时，从当前仓库的 **Releases 附件**下载文件即可，不需要克隆源码或在电脑上存在 `output/`。完整命令统一维护在 [README 的烧录与恢复流程](README.md#烧录与恢复完整操作步骤)，涵盖 Windows/macOS/Linux 电脑准备文件，以及 PF818 上的 Linux Bash 操作。
+安装已发布镜像时，标准小卡版从 **Releases 附件**下载，大卡 Live 版从 Release 说明中提供的 **OneDrive 链接**下载，不需要克隆源码或在电脑上存在 `output/`。16GB 及以上卡推荐大卡版：已内置两个系统包，无需 U 盘。小卡版完整命令保留在 [README 的烧录与恢复流程](README.md#烧录与恢复完整操作步骤)。
+
+## 大卡 Live 快速安装
+
+1. 下载完整的 `PF818_R5_LIVE_16GB_*.img.gz` 及校验文件，解压后用 Etcher 写入至少 16GB 的 TF 卡。
+2. 从 TF 启动 PF818，可接网线后通过 SSH 操作，DHCP 设备名为 `pf818-live`。
+3. 直接使用 `root` / `1234` 登录，跳过 Armbian 首次用户创建及强制改密；终端显示中英双语安装和 `passwd` 提醒。
+4. 运行 `sudo pf818-install`，先选简体中文或 English，再选安装 Linux 或恢复安卓。
+5. 核对程序识别的目标 eMMC，按显示的完整文字确认。程序校验、写入、读回校验后提示关机。
+6. 关机后拔 TF，再开机进入机内系统。
+
+环境变量、完整菜单流程和验证范围见 [README](README.md#大卡-live-安装与恢复16gb-及以上)。原有小卡版本及下文的手动流程继续可用。
 
 ## 选择同一个 Release 的附件
 

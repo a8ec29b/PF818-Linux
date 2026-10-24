@@ -97,7 +97,7 @@ def textfile(name, content):
     return p
 
 
-def read_gpt(path):
+def read_gpt(path, *, fixed_layout=True):
     with path.open('rb') as f:
         headers = []
         for lba in (1, path.stat().st_size // 512 - 1):
@@ -128,7 +128,7 @@ def read_gpt(path):
             if e[:16] != bytes(16):
                 start, end = struct.unpack_from('<QQ', e, 32)
                 partitions.append((start * 512, (end - start + 1) * 512))
-    if partitions != [(32768 * 512, 128 * 1024**2), (294912 * 512, 2432 * 1024**2)]:
+    if fixed_layout and partitions != [(32768 * 512, 128 * 1024**2), (294912 * 512, 2432 * 1024**2)]:
         raise ValueError(f'Expected the fixed R4 partition layout, got {partitions}')
     return headers, partitions
 
