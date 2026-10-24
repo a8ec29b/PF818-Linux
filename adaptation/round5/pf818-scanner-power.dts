@@ -1,0 +1,19 @@
+/dts-v1/;
+/plugin/;
+
+// The factory init script exports GPIO55 = GPIO1_C7 and drives it high.
+// Use an explicit path so the R4 DTB does not need a __symbols__ section.
+/ {
+    compatible = "bozztek,pf818", "rockchip,rk3399";
+    fragment@0 {
+        target-path = "/pinctrl/gpio@ff730000";
+        __overlay__ {
+            pf818-scanner-power {
+                gpio-hog;
+                gpios = <23 0>;
+                output-high;
+                line-name = "pf818-scanner-power";
+            };
+        };
+    };
+};

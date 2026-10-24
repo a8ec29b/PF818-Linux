@@ -1,0 +1,44 @@
+# PF818 R5：扫码器、红绿指示灯及摄像头补光（待启动验收）
+
+在 R4 的 6.18.57-ophub / Armbian trixie 基础上加入 NFC 下方独立扫码器的原生串口支持，以及红绿指示灯和摄像头白色补光控制。扫码程序可直接获取解码内容，不依赖安卓应用或原厂扫码库；灯光采用标准 Linux LED 接口，三路默认关闭。
+
+## 新功能
+
+- 固定设备名 `/dev/pf818-scanner`，115200 / 8N1。
+- GPIO1_C7 供电配置，复用镜像已有 `xr_serial` 驱动。
+- `pf818-scan` 输出文本，`pf818-scan --json` 输出 JSON Lines，`--once --timeout 30` 可读取一次。
+- `pf818-led` 控制顶部左上角绿灯、其右侧红灯和主摄像头两侧白色补光；红绿灯支持内核定时闪烁，补光按需开关。
+- TF/eMMC 两种镜像，各自使用独立 UUID/GUID；保留 R4 的内核、屏幕、NFC 和其他适配。
+- 默认分发两份约 797MiB 的压缩镜像，不保留重复的未压缩成品与临时镜像。
+
+## 选择附件
+
+- `PF818_R5_TF_*.img.gz`：解压后用 Etcher 写 TF，至少 4GB 卡；首次启动不自动扩容。
+- `PF818_R5_EMMC_*.img.gz`：在 TF 启动的 Linux 中写入 eMMC，首次从 eMMC 启动时扩容。
+- `.sha256`：校验对应的压缩包或未压缩镜像。
+- `.json`：来源、UUID、构建信息和离线验证结果。
+
+烧录流程与 R4 相同：**Etcher 写 TF → 关机插卡 → 从 TF 启动 → 在 TF 的 Linux 中把 eMMC 版镜像写入机内存储 → 关机拔卡 → 从 eMMC 启动**。原先通过 `chroot` 预先放置安装镜像的准备方式仍可沿用。
+
+TF 固定根分区的剩余空间装不下另一个完整镜像；需要将安装镜像存入 TF 系统时，先在更大的 TF 卡上扩展分区，或把文件放在 U 盘/通过网络提供。写入前按实际 `SD` / `MMC` 类型和根挂载识别介质，不要硬编码设备编号。完整步骤见 [INSTALLING.md](INSTALLING.md)。
+
+## 使用
+
+```sh
+pf818-scan --once --timeout 30
+pf818-scan --json
+pf818-nfc-read
+pf818-led status
+sudo pf818-led green on
+sudo pf818-led green off
+sudo pf818-led fill on
+sudo pf818-led fill off
+```
+
+普通用户可加入 `dialout` 组并重新登录后使用扫码器；其他设备及 Python 调用示例见 [USAGE.md](USAGE.md)。基础账户沿用 `root` / `1234`，首次登录后修改密码。
+
+## 已验证与待验证
+
+已在原厂安卓真机上运行静态 ARM64 Linux 程序，正确接收已知二维码 `PF818-LINUX-SCAN-20261024`。三路灯逐路点亮并由使用者确认实际位置和颜色。八项串口检查、四项 LED 工具检查及两种镜像的离线文件系统/GPT/载荷/LED 映射/默认关闭/引导区域/压缩读回检查通过。
+
+**R5 Armbian 的 TF 冷启动、读码、LED 控制、eMMC 安装和独立启动尚未实测，建议先作为预发布版本验收。** 本次没有改写设备内的安卓系统。扫码图像输出和桌面键盘模拟不在本版实现范围内。
