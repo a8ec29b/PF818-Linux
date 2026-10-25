@@ -35,7 +35,7 @@ PF818 收银终端的 Linux 外设适配源码，硬件采用 Rockchip RK3399 / 
 
 ## 下载镜像与获取源码
 
-**Git 源码仓库不包含大镜像文件。小卡版通过 Releases 附件分发，大卡 Live 版通过发布者提供的 OneDrive 下载链接分发。** OneDrive 地址见对应 Release 说明；大卡包是一个完整 `.img.gz`，不分片。安装已发布的系统无需克隆仓库，也不需要自行构建。
+**Git 源码仓库不包含大镜像文件。小卡版通过 Releases 附件分发，大卡 Live 版通过下表中的 OneDrive 链接下载。** 大卡包是一个完整 `.img.gz`，不分片。安装已发布的系统无需克隆仓库，也不需要自行构建。
 
 先按卡容量选择：
 
@@ -50,7 +50,7 @@ PF818 收银终端的 Linux 外设适配源码，硬件采用 Rockchip RK3399 / 
 | --- | --- |
 | `PF818_R5_TF_*.img.gz` | 写入 TF 卡，用来启动 Linux 和安装/恢复机内系统 |
 | `PF818_R5_EMMC_*.img.gz` | 在 TF 启动的 Linux 中写入 eMMC |
-| `PF818_R5_LIVE_16GB_*.img.gz` | OneDrive 提供的大卡 Live 版，内置 Linux 安装与安卓恢复包 |
+| `PF818_R5_LIVE_16GB_*.img.gz` | [下载大卡 Live 版（OneDrive，约 2.7GiB）](https://1drv.ms/u/c/186e2631aeb25aa5/IQBmPL5Yu8JpQ6PDKGAOCFraATjwVNNZ3fRV7BFKSiKOVp0?e=qbrCpZ)，适用于 16GB 及以上 TF 卡，内置 Linux 安装与安卓恢复包 |
 | 与镜像同名的 `.img.gz.sha256` | 校验下载的压缩包 |
 | 与镜像同名的 `.img.sha256` | 校验解压后的镜像或写入内容 |
 | 与镜像同名前缀的 `.json` | 查看来源、大小、UUID 和构建验证结果 |
@@ -152,7 +152,7 @@ LED 支持复用现有内核内建的 `CONFIG_LEDS_GPIO=y` 与 timer trigger，�
 
 ### 1. 写卡并启动
 
-1. 从 Release 说明中的 **OneDrive 链接**下载 `PF818_R5_LIVE_16GB_*.img.gz` 及同名 `.sha256`，按校验文件核对下载内容。
+1. 从 [OneDrive 下载大卡 Live 镜像](https://1drv.ms/u/c/186e2631aeb25aa5/IQBmPL5Yu8JpQ6PDKGAOCFraATjwVNNZ3fRV7BFKSiKOVp0?e=qbrCpZ)（`PF818_R5_LIVE_16GB_*.img.gz`，约 2.7GiB），并从对应 Release 附件获取同名 `.img.gz.sha256` 校验文件，按校验文件核对下载内容。
 2. 解压得到 `.img`；电脑需有约 9GiB 的解压空间。用 balenaEtcher 把该镜像写入 **16GB 或更大的 TF 卡**，等待写入验证完成。
 3. PF818 关机，插入 TF 卡，连接网线，再开机。安装/恢复不需要外接 U 盘。
 4. 直接使用 **`root` / `1234`** 登录。Live 版跳过 Armbian 的首次用户创建流程，也不强制首次改密；登录提示会提醒可用 `passwd` 自行修改。
