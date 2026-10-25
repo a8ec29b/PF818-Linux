@@ -174,27 +174,13 @@ ssh root@192.168.1.123
 
 ### 2. 登录后的中英双语提示
 
-Live 版的 `/etc/profile.d/pf818-live.sh` 在登录环境中设置：
-
-```sh
-PF818_LIVE=1
-PF818_INSTALLER=/usr/local/sbin/pf818-install
-PF818_INSTALL_BUNDLE=/opt/pf818-installer
-```
-
 每次交互式登录会显示简体中文和英文提示，包括安装命令、联网方式及 `passwd` 改密说明。运行：
 
 ```sh
 sudo pf818-install
 ```
 
-已经是 root 时可直接运行 `pf818-install`。查看入口或自行改密：
-
-```sh
-echo "$PF818_INSTALLER"
-echo "$PF818_INSTALL_BUNDLE"
-passwd
-```
+已经是 root 时可直接运行 `pf818-install`。如需修改登录密码，运行 `passwd`。
 
 ### 3. 选择语言及系统，按提示完成写入
 
