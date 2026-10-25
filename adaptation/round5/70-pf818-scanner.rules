@@ -1,0 +1,2 @@
+# XR22804 UART C is the PF818 scanner. Do not depend on ttyUSB enumeration order.
+ACTION=="add", SUBSYSTEM=="tty", ATTRS{idVendor}=="04e2", ATTRS{idProduct}=="1402", SYMLINK+="pf818-scanner", GROUP="dialout", MODE="0660"

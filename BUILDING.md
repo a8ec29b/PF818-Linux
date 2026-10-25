@@ -4,6 +4,8 @@
 
 所有命令在仓库根目录运行。`build/` 为中间文件，`output/` 为本地成品，两者均由 Git 忽略。
 
+预编译镜像由构建者单独上传至 Releases 附件；克隆源码不会获得 `output/` 中的大文件。直接安装 Release 镜像的使用者无需执行本文构建流程，按 [README](README.md) 的下载与安装步骤操作即可。
+
 ## 1. 基础镜像与 R1
 
 从 ophub 的仓库或发布存档取得 README 指定的原始 SW799 镜像，解压后放在仓库根目录；也可指定绝对路径：
@@ -101,7 +103,86 @@ pf818-qmi-status
 
 NFC 工具只完成寻卡、选卡与 UID 读取；结束时关闭射频场。QMI 工具查询服务版本，不建立数据连接。要使用标准 QMI 工具，可自行安装发行版 `libqmi-utils`。
 
-## 5. eMMC 派生镜像
+## 5. R5：从现有 R4 镜像加入扫码器与三路灯
+
+这是已有 R4 成品时的直接构建入口。接受 R4 TF 或 eMMC 的 `.img` / `.img.gz`，无需 R4 的 JSON 清单，也无需重新准备屏幕、BlueZ 和 NFC 库；这些文件从输入镜像保留。构建依赖为 Python 3.11+、`debugfs` / `e2fsck` / `tune2fs`（e2fsprogs）、`dtc` / `fdtoverlay` / `fdtget`（device-tree-compiler）。可在具备这些工具的 Linux 或 macOS 主机运行。
+
+先在 ARM64 Linux 上编译扫码命令：
+
+```sh
+make -C adaptation/round5
+```
+
+也可以在其他主机使用 ARM64 Linux 交叉编译器：
+
+```sh
+make -C adaptation/round5 CC=aarch64-linux-gnu-gcc
+```
+
+macOS 可使用 Zig 0.13.0 交叉编译静态 ELF，本次成品采用此方法：
+
+```sh
+mkdir -p build/round5
+zig cc -target aarch64-linux-musl -static -O2 -s \
+  -Wall -Wextra -Werror -std=c11 \
+  adaptation/round5/pf818-scan.c -o build/round5/pf818-scan
+```
+
+随后构建两个存储版本：
+
+```sh
+python3 adaptation/build_round5.py \
+  --source /absolute/path/PF818_R4_EMMC_Armbian_trixie_6.18.57_TIMESTAMP.img.gz \
+  --target both --gzip-only --cleanup
+```
+
+`--target tf` / `--target emmc` 可只构建一种。`--binary` 可指定编译好的 ARM64 命令；也可用 `PF818_R4_IMAGE` 提供输入路径。输出在 `output/`。推荐上述节省空间的参数：每个版本只保留 `.img.gz`、压缩包及解压后镜像的 SHA-256、JSON 清单；压缩读回验证后删除成品 `.img`，整轮成功后清理临时镜像。原厂备份和外部输入 R4 包不删除。需要保留 `.img` 时，使用 `--gzip` 替代 `--gzip-only`。推荐为构建过程预留至少约 15GB 临时空间；两份压缩成品合计约 1.6GiB。
+
+脚本验证输入 GPT、固定 R4 分区布局、R4 标识、内核的 `xr_serial` 模块/USB ID 及内建 LED/timer 支持。它将 GPIO1_C7 扫码器供电覆盖和三路灯覆盖合并到 R4 DTB，生成 `rk3399-pf818-r5.dtb`，不依赖 R1 提取的 DTS。灯覆盖使用输入 DTB 保留的 `gpio0` / `gpio1` / `gpio2` 符号，逐项校验 GPIO 控制器、偏移、有效电平、节点名及默认关闭状态。保留内核、initramfs、屏幕模块、NFC 库和其他原有系统文件；每个输出生成独立的文件系统 UUID、GPT 磁盘及分区 GUID。TF 版本关闭 eMMC 扩容服务；eMMC 版本更新并启用原有扩容服务。构建只处理普通文件，禁止把块设备用作输入，不烧录任何物理设备。
+
+验证包括：文件系统检查、主备 GPT CRC、启动配置及 fstab、载荷逐文件读回、内核/initramfs/屏幕/NFC 保留检查、引导程序区域和分区写回哈希。它们不等同于 PF818 上的 R5 冷启动或 eMMC 独立启动实测。
+
+在构建主机上测试读取程序的串口逻辑：
+
+```sh
+make -C adaptation/round5 OUT=../../build/round5/pf818-scan-host
+python3 adaptation/round5/test_reader.py build/round5/pf818-scan-host
+python3 adaptation/round5/test_lights.py
+```
+
+注意：本机编译的测试程序与 ARM64 镜像载荷使用不同输出文件名。
+
+## 6. 大卡 Live 安装版（16GB 及以上）
+
+标准 TF/eMMC 成品保留不变。另运行 `adaptation/build_live.py`，从已生成的 R5 TF 镜像派生大卡版，内置现有的 R5 eMMC 压缩镜像和样机安卓整盘备份。
+
+需要 Python 3.11+、e2fsprogs 的 `debugfs` / `e2fsck` / `tune2fs` / `resize2fs`，以及支持 `openssl passwd -6` 的 OpenSSL。macOS 系统自带 LibreSSL 可能不支持 `-6`，可通过 `--openssl /path/to/openssl` 明确选择 OpenSSL。构建期间推荐预留至少约 25GB 临时空间。
+
+输入的 R5 TF 与 eMMC `.img.gz` 各自都需保留旁边的同名前缀 `.json`。命令中的路径自行替换：
+
+```sh
+python3 adaptation/build_live.py \
+  --tf-image /path/to/PF818_R5_TF_VERSION.img.gz \
+  --linux-image /path/to/PF818_R5_EMMC_VERSION.img.gz \
+  --android-backup /path/to/PF818_Stock_Android_backup.img.gz
+```
+
+输出为单个 `PF818_R5_LIVE_16GB_*.img.gz`，约 2.7GiB，不分片，另生成压缩包/原始镜像的 SHA-256 和 JSON 清单。成功后删除本轮大体积临时镜像与未压缩成品；输入包及原有小卡版均保留。构建者可按需保存或分发该 Live 镜像。
+
+大卡镜像的根文件系统扩为 8GiB，主备 GPT 调整为新布局并生成独立 GUID，文件系统也使用新的 UUID。完整镜像解压后约 8.14GiB，因此推荐至少 16GB 卡。其余卡空间不自动扩展。
+
+构建会将两份压缩包及长度/哈希清单放到 `/opt/pf818-installer/`，安装 `/usr/local/sbin/pf818-install` 及登录环境脚本。Live 版设置 root 密码为 1234、清除强制改密/首次用户设置入口；首次交互登录显示中英双语命令和 `passwd` 提醒。首次启动生成独立 SSH 主机密钥。有线 DHCP 的设备名为 `pf818-live`。
+
+检查安装器和 GPT 处理逻辑（只操作临时普通文件，不写物理盘）：
+
+```sh
+python3 adaptation/live/test_installer.py
+python3 adaptation/live/test_gpt.py
+```
+
+离线构建还验证内置包逐文件读回、root 登录设置、SSH/keygen 启用、启动 UUID 配置、原有 R5 内核/initramfs/DTB/屏幕/NFC/扫码/灯控文件保留，以及压缩包解压读回哈希。实际 TF 冷启动及真实 eMMC 安装/恢复仍需设备验收。
+
+## 7. 旧版 R4 eMMC 派生镜像
 
 R4 `.img` 和旁边的 `.json` 清单都需保留。
 

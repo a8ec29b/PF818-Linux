@@ -1,0 +1,71 @@
+#!/usr/bin/python3
+"""Control PF818 status LEDs and camera fill light through Linux LED sysfs."""
+import argparse
+import json
+from pathlib import Path
+import sys
+
+ROOT = Path('/sys/class/leds')
+LIGHTS = {'green': 'green:status', 'red': 'red:status', 'fill': 'white:flash'}
+
+
+def positive_ms(value):
+    number = int(value)
+    if not 1 <= number <= 60000:
+        raise argparse.ArgumentTypeError('delay must be 1..60000 milliseconds')
+    return number
+
+
+def status(name):
+    path = ROOT / LIGHTS[name]
+    triggers = (path / 'trigger').read_text().split()
+    active = next((t[1:-1] for t in triggers if t.startswith('[') and t.endswith(']')), 'none')
+    return {'device': str(path), 'brightness': int((path / 'brightness').read_text()),
+            'max_brightness': int((path / 'max_brightness').read_text()), 'trigger': active}
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__, epilog=(
+        'Examples: pf818-led status; pf818-led green on; '
+        'pf818-led red blink --on-ms 200 --off-ms 800; pf818-led fill off'))
+    parser.add_argument('light', choices=(*LIGHTS, 'status'))
+    parser.add_argument('action', nargs='?', choices=('on', 'off', 'blink', 'status'))
+    parser.add_argument('--on-ms', type=positive_ms, default=500)
+    parser.add_argument('--off-ms', type=positive_ms, default=500)
+    args = parser.parse_args(argv)
+    if args.light == 'status':
+        if args.action is not None:
+            parser.error('global status does not take an action')
+        names = LIGHTS
+    else:
+        if args.action is None:
+            parser.error('choose on, off, blink or status')
+        if args.light == 'fill' and args.action == 'blink':
+            parser.error('fill light supports on/off/status; blinking is for red/green LEDs')
+        names = (args.light,)
+    try:
+        if args.light == 'status' or args.action == 'status':
+            print(json.dumps({name: status(name) for name in names}, indent=2))
+            return 0
+        path = ROOT / LIGHTS[args.light]
+        # Clear any previous trigger before assigning a new application state.
+        (path / 'trigger').write_text('none\n')
+        if args.action == 'off':
+            (path / 'brightness').write_text('0\n')
+        else:
+            maximum = int((path / 'max_brightness').read_text())
+            (path / 'brightness').write_text(f'{maximum}\n')
+            if args.action == 'blink':
+                (path / 'trigger').write_text('timer\n')
+                (path / 'delay_on').write_text(f'{args.on_ms}\n')
+                (path / 'delay_off').write_text(f'{args.off_ms}\n')
+        return 0
+    except PermissionError:
+        print('LED access denied; run with sudo or configure LED sysfs permissions.', file=sys.stderr)
+    except (OSError, ValueError) as error:
+        print(f'PF818 LED control failed: {error}', file=sys.stderr)
+    return 1
+
+
+if __name__ == '__main__':
+    sys.exit(main())

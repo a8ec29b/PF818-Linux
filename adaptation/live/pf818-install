@@ -1,0 +1,310 @@
+#!/usr/bin/python3
+"""Interactive PF818 Live installer. Writes only the internal eMMC, from SD boot."""
+import fcntl
+import gzip
+import hashlib
+import json
+import logging
+import os
+from pathlib import Path
+import re
+import stat
+import struct
+import subprocess
+import sys
+import time
+
+BUNDLE = Path('/opt/pf818-installer')
+SYS_BLOCK = Path('/sys/class/block')
+COMPATIBLE = Path('/proc/device-tree/compatible')
+LANG = 'en'
+TEXT = {
+    'title': ('PF818 Live 系统安装与恢复', 'PF818 Live system installation and recovery'),
+    'menu': ('\n1. 安装 R5 Linux 到机内 eMMC\n2. 恢复样机 Android 到机内 eMMC\n0. 退出',
+             '\n1. Install R5 Linux to internal eMMC\n2. Restore stock Android to internal eMMC\n0. Exit'),
+    'choice': ('请选择 [0/1/2]：', 'Choose [0/1/2]: '),
+    'invalid': ('输入无效，请重新选择。', 'Invalid input. Please choose again.'),
+    'linux': ('安装 R5 Linux', 'Install R5 Linux'),
+    'android': ('恢复样机 Android', 'Restore stock Android'),
+    'stage1': ('\n[1/5] 检查 TF 启动环境及 eMMC', '\n[1/5] Check SD boot environment and eMMC'),
+    'stage2': ('\n[2/5] 校验所选镜像，可能需要几分钟', '\n[2/5] Verify selected image; this may take several minutes'),
+    'stage3': ('\n[3/5] 确认写入目标', '\n[3/5] Confirm installation target'),
+    'stage4': ('\n[4/5] 卸载目标分区并写入', '\n[4/5] Unmount target partitions and write image'),
+    'stage5': ('\n[5/5] 同步并读回校验', '\n[5/5] Sync and verify written data'),
+    'environment': ('TF 根分区：{root}\n目标 eMMC：{target}\n容量：{size:.2f} GiB\n操作：{action}',
+                    'SD root partition: {root}\nTarget eMMC: {target}\nCapacity: {size:.2f} GiB\nAction: {action}'),
+    'image': ('镜像：{file}\n解压后长度：{size} 字节', 'Image: {file}\nUncompressed length: {size} bytes'),
+    'erase': ('将覆盖目标 eMMC 的原系统和数据。写入期间请保持供电，勿中断。',
+              'The current OS and data on the target eMMC will be overwritten. Keep power connected and do not interrupt writing.'),
+    'confirmation': ('输入以下完整文字开始写入，其他输入取消：\n{token}\n> ',
+                     'Type the complete text below to start writing; anything else cancels:\n{token}\n> '),
+    'cancelled': ('已取消，未开始写入。', 'Cancelled; writing did not start.'),
+    'done': ('\n写入及读回校验通过。', '\nWriting and readback verification passed.'),
+    'next_linux': ('关机后拔出 TF 卡，再开机进入 Linux；首次从 eMMC 启动会自动扩容。',
+                   'After shutdown, remove the SD card and power on to boot Linux. The eMMC root filesystem grows on its first boot.'),
+    'next_android': ('关机后拔出 TF 卡，再开机进入 Android。',
+                     'After shutdown, remove the SD card and power on to boot Android.'),
+    'poweroff': ('1. 现在关机\n2. 返回菜单\n请选择 [2]：',
+                 '1. Shut down now\n2. Return to menu\nChoose [2]: '),
+    'root': ('请在 PF818 Linux 中使用 sudo pf818-install 或 root 账号运行。',
+             'Run sudo pf818-install, or use the root account, on PF818 Linux.'),
+    'platform': ('此安装器只能在 PF818 的 Linux 中运行。', 'This installer runs only on PF818 Linux.'),
+    'board': ('没有识别到 PF818 设备树。', 'The PF818 device tree was not detected.'),
+    'sd': ('当前根系统不是从 TF 卡启动，不能覆盖正在运行的机内系统。',
+           'The root system is not on an SD card. The running internal system cannot be overwritten.'),
+    'target': ('没有找到唯一的内部 eMMC。', 'A unique internal eMMC was not found.'),
+    'source': ('安装镜像位于目标 eMMC 上，不能边覆盖边读取。',
+               'The source image is on the target eMMC and cannot be overwritten while being read.'),
+    'size': ('目标容量与所选镜像不匹配。', 'The target capacity does not match the selected image.'),
+    'manifest': ('安装包清单无效或镜像文件缺失。', 'The bundle manifest is invalid or an image is missing.'),
+    'hash': ('镜像长度或 SHA-256 不匹配，已停止。', 'Image length or SHA-256 mismatch; stopped.'),
+    'changed': ('检查期间目标设备发生变化，已停止。', 'The target device changed during checks; stopped.'),
+    'busy': ('目标分区仍在使用，未开始写入。', 'The target is still in use; writing did not start.'),
+    'readback': ('写入后的数据校验失败。请保留 TF 启动环境，检查后重试。',
+                 'Written data failed verification. Keep the SD boot environment and retry after checking the problem.'),
+    'interrupted': ('操作已中断。若已开始写入，eMMC 内容可能不完整；请继续从 TF 启动后重试。',
+                    'Operation interrupted. If writing had started, eMMC contents may be incomplete. Boot from SD and retry.'),
+    'failed': ('操作失败：{error}\n日志：/var/log/pf818-install.log',
+               'Operation failed: {error}\nLog: /var/log/pf818-install.log'),
+    'verify': ('校验镜像', 'Verifying image'),
+    'write': ('写入 eMMC', 'Writing eMMC'),
+    'read': ('读回校验', 'Verifying readback'),
+}
+
+
+def tr(key, **values):
+    return TEXT[key][0 if LANG == 'zh' else 1].format(**values)
+
+
+def say(key, **values):
+    print(tr(key, **values), flush=True)
+
+
+class InstallError(RuntimeError):
+    def __init__(self, key):
+        self.key = key
+        super().__init__(key)
+
+
+def run(args):
+    return subprocess.check_output([str(a) for a in args], text=True).strip()
+
+
+def select_language():
+    print('PF818 Live\n1. 简体中文\n2. English\n0. 退出 / Exit', flush=True)
+    while True:
+        choice = input('语言 / Language [1]: ').strip() or '1'
+        if choice in ('0', '1', '2'):
+            return {'0': None, '1': 'zh', '2': 'en'}[choice]
+        print('请输入 0、1 或 2 / Enter 0, 1 or 2.', flush=True)
+
+
+def device_size(path):
+    with path.open('rb', buffering=0) as device:
+        return struct.unpack('Q', fcntl.ioctl(device.fileno(), 0x80081272, bytes(8)))[0]
+
+
+def environment():
+    if b'bozztek,pf818\0' not in COMPATIBLE.read_bytes():
+        raise InstallError('board')
+    root = Path(run(['findmnt', '-n', '-o', 'SOURCE', '/'])).resolve()
+    parent = run(['lsblk', '-n', '-d', '-o', 'PKNAME', root])
+    type_file = SYS_BLOCK / parent / 'device/type'
+    if not parent or not type_file.is_file() or type_file.read_text().strip() != 'SD':
+        raise InstallError('sd')
+    candidates = [p for p in SYS_BLOCK.glob('mmcblk*') if re.fullmatch(r'mmcblk\d+', p.name)
+                  and (p / 'device/type').is_file() and (p / 'device/type').read_text().strip() == 'MMC']
+    if len(candidates) != 1:
+        raise InstallError('target')
+    target = Path('/dev') / candidates[0].name
+    if target.name == parent or not stat.S_ISBLK(target.stat().st_mode):
+        raise InstallError('target')
+    if (candidates[0] / 'ro').read_text().strip() != '0':
+        raise InstallError('target')
+    return {'root': str(root), 'target': target, 'bytes': device_size(target)}
+
+
+def payload(bundle, kind):
+    try:
+        manifest = json.loads((bundle / 'manifest.json').read_text())
+        entry = manifest['images'][kind]
+        path = (bundle / entry['file']).resolve()
+        path.relative_to(bundle.resolve())
+        if manifest['format'] != 1 or not path.is_file() or not entry['file'].endswith('.img.gz'):
+            raise ValueError('file')
+        if not isinstance(entry['bytes'], int) or entry['bytes'] <= 0:
+            raise ValueError('length')
+        if not re.fullmatch(r'[0-9a-f]{64}', entry['sha256']):
+            raise ValueError('hash')
+        return path, entry
+    except (OSError, KeyError, TypeError, ValueError) as error:
+        raise InstallError('manifest') from error
+
+
+def validate_capacity(kind, size, image_bytes):
+    if image_bytes <= 0 or size < image_bytes or (kind == 'android' and size != image_bytes):
+        raise InstallError('size')
+
+
+def target_devices(target):
+    return {Path(p).resolve() for p in run(['lsblk', '-r', '-n', '-p', '-o', 'NAME', target]).splitlines()}
+
+
+def source_is_separate(path, target):
+    source = Path(run(['findmnt', '-n', '-o', 'SOURCE', '-T', path])).resolve()
+    if source in target_devices(target):
+        raise InstallError('source')
+
+
+def progress(key, total):
+    last = [0.0]
+
+    def update(done):
+        now = time.monotonic()
+        if done == total or now - last[0] >= 1:
+            print(f'\r{tr(key)}: {done * 100 / total:5.1f}%  '
+                  f'{done / 1024**2:.0f}/{total / 1024**2:.0f} MiB', end='', flush=True)
+            last[0] = now
+            if done == total:
+                print(flush=True)
+    return update
+
+
+def verify_archive(path, expected_size, expected_hash, report):
+    digest, size = hashlib.sha256(), 0
+    with gzip.open(path, 'rb') as source:
+        while chunk := source.read(4 * 1024**2):
+            size += len(chunk)
+            if size > expected_size:
+                raise InstallError('hash')
+            digest.update(chunk)
+            report(size)
+    if size != expected_size or digest.hexdigest() != expected_hash:
+        raise InstallError('hash')
+
+
+def release_target(target):
+    devices = target_devices(target)
+    swaps = json.loads(run(['swapon', '--show', '--json', '--output', 'NAME']))
+    for entry in swaps.get('swapdevices', []):
+        swap = Path(entry['name'])
+        backing = swap.resolve() if swap.is_block_device() else Path(
+            run(['findmnt', '-n', '-o', 'SOURCE', '-T', swap])).resolve()
+        if backing in devices:
+            subprocess.run(['swapoff', str(swap)], check=True)
+    mounts = json.loads(run(['findmnt', '--json', '--list', '--output', 'SOURCE,TARGET']))
+    targets = [entry['target'] for entry in mounts.get('filesystems', [])
+               if Path(entry['source']).resolve() in devices]
+    for mount in sorted(set(targets), key=lambda p: len(Path(p).parts), reverse=True):
+        subprocess.run(['umount', '--', mount], check=True)
+
+
+def flash_archive(path, target, expected_size, expected_hash, write_report, read_report):
+    # Linux O_EXCL prevents opening a block device that is still mounted/in use.
+    fd = os.open(target, os.O_RDWR | os.O_EXCL)
+    with os.fdopen(fd, 'r+b', buffering=0) as destination:
+        digest, written = hashlib.sha256(), 0
+        with gzip.open(path, 'rb') as source:
+            while chunk := source.read(4 * 1024**2):
+                if written + len(chunk) > expected_size:
+                    raise InstallError('hash')
+                view = memoryview(chunk)
+                while view:
+                    count = destination.write(view)
+                    if not count:
+                        raise OSError('Short device write')
+                    view = view[count:]
+                written += len(chunk)
+                digest.update(chunk)
+                write_report(written)
+        os.fsync(destination.fileno())
+        if written != expected_size or digest.hexdigest() != expected_hash:
+            raise InstallError('hash')
+        say('stage5')
+        destination.seek(0)
+        digest, read = hashlib.sha256(), 0
+        while read < expected_size:
+            chunk = destination.read(min(4 * 1024**2, expected_size - read))
+            if not chunk:
+                raise InstallError('readback')
+            digest.update(chunk)
+            read += len(chunk)
+            read_report(read)
+        if digest.hexdigest() != expected_hash:
+            raise InstallError('readback')
+
+
+def action(kind, bundle=BUNDLE):
+    say('stage1')
+    env = environment()
+    image, entry = payload(bundle, kind)
+    source_is_separate(image, env['target'])
+    validate_capacity(kind, env['bytes'], entry['bytes'])
+    say('environment', root=env['root'], target=env['target'], size=env['bytes'] / 1024**3, action=tr(kind))
+    say('image', file=image, size=entry['bytes'])
+    say('stage2')
+    verify_archive(image, entry['bytes'], entry['sha256'], progress('verify', entry['bytes']))
+    say('stage3')
+    say('erase')
+    token = f'{"INSTALL" if kind == "linux" else "RESTORE"} {env["target"]}'
+    if input(tr('confirmation', token=token)).strip() != token:
+        say('cancelled')
+        return False
+    if environment() != env:
+        raise InstallError('changed')
+    say('stage4')
+    logging.info('Start %s target=%s image=%s bytes=%s sha256=%s',
+                 kind, env['target'], image, entry['bytes'], entry['sha256'])
+    release_target(env['target'])
+    flash_archive(image, env['target'], entry['bytes'], entry['sha256'],
+                  progress('write', entry['bytes']), progress('read', entry['bytes']))
+    logging.info('Completed %s; readback passed', kind)
+    say('done')
+    say('next_' + kind)
+    return True
+
+
+def main():
+    global LANG
+    LANG = select_language()
+    if LANG is None:
+        return 0
+    say('title')
+    if not sys.platform.startswith('linux'):
+        say('platform')
+        return 1
+    if os.geteuid() != 0:
+        say('root')
+        return 1
+    logging.basicConfig(filename='/var/log/pf818-install.log', level=logging.INFO,
+                        format='%(asctime)s %(levelname)s %(message)s')
+    while True:
+        say('menu')
+        choice = input(tr('choice')).strip()
+        if choice == '0':
+            return 0
+        if choice not in ('1', '2'):
+            say('invalid')
+            continue
+        try:
+            if action('linux' if choice == '1' else 'android'):
+                if input(tr('poweroff')).strip() == '1':
+                    subprocess.run(['systemctl', 'poweroff'], check=True)
+                    return 0
+        except KeyboardInterrupt:
+            print()
+            say('interrupted')
+            logging.warning('Operation interrupted by user')
+        except (InstallError, OSError, EOFError, ValueError, subprocess.SubprocessError) as error:
+            print()
+            message = tr(error.key) if isinstance(error, InstallError) else str(error)
+            say('failed', error=message)
+            logging.exception('Installation failed')
+
+
+if __name__ == '__main__':
+    try:
+        sys.exit(main())
+    except (KeyboardInterrupt, EOFError):
+        print()
+        sys.exit(130)

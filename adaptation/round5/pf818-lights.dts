@@ -1,0 +1,36 @@
+/dts-v1/;
+/plugin/;
+
+// Physical lights verified on this PF818: active high, all off by default.
+// gpio0/1/2 symbols are retained in the supplied R4 DTB.
+/ {
+    compatible = "bozztek,pf818", "rockchip,rk3399";
+    fragment@0 {
+        target-path = "/";
+        __overlay__ {
+            model = "Bozztek PF818 (SW799) R5";
+
+            pf818-leds {
+                compatible = "gpio-leds";
+
+                green {
+                    label = "green:status";
+                    gpios = <&gpio1 0 0>; // GPIO1_A0, Android GPIO32
+                    default-state = "off";
+                };
+
+                red {
+                    label = "red:status";
+                    gpios = <&gpio2 28 0>; // GPIO2_D4, Android GPIO92
+                    default-state = "off";
+                };
+
+                fill {
+                    label = "white:flash";
+                    gpios = <&gpio0 6 0>; // GPIO0_A6, Android GPIO6
+                    default-state = "off";
+                };
+            };
+        };
+    };
+};
