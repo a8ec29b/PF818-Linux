@@ -57,7 +57,7 @@ Releases 中的标准版文件如下：
 
 另有一个更完整的大卡 Live 版本，推荐给使用 **16GB 或更大 TF 卡（包括 32GB）** 的用户。卡内已经放好 **R5 Linux 安装包和样机 Android 7.1.2 恢复包**，可以直接在设备上选择安装 Linux 或恢复安卓，无需另备 U 盘，也不用再单独下载、搬运这两个系统包。原有小卡版继续保留。
 
-**[下载大卡完整版（OneDrive，约 2.7GiB）](https://1drv.ms/u/c/186e2631aeb25aa5/IQBmPL5Yu8JpQ6PDKGAOCFraATjwVNNZ3fRV7BFKSiKOVp0?e=qbrCpZ)**。此包单独通过 OneDrive 分发，不放在 GitHub Releases 中；下载的是一个完整 `.img.gz`，不分片。
+**[大卡完整版下载文件夹（OneDrive，镜像约 2.7GiB）](https://1drv.ms/f/c/186e2631aeb25aa5/IgC3XRdvnzqtTa9NNZnPOoe0ATY4-Ukp5VOf0kAp7Uel23Y?e=9RNoSk)**。请选择文件名带 **`2026-10-26_0233`** 的修复版，已修复安装器第 4 步报错的问题。此包单独通过 OneDrive 分发，不放在 GitHub Releases 中；镜像是一个完整 `.img.gz`，不分片。
 
 简单使用方法：
 
@@ -159,7 +159,7 @@ LED 支持复用现有内核内建的 `CONFIG_LEDS_GPIO=y` 与 timer trigger，�
 
 ### 1. 写卡并启动
 
-1. 从 [OneDrive 下载大卡 Live 镜像](https://1drv.ms/u/c/186e2631aeb25aa5/IQBmPL5Yu8JpQ6PDKGAOCFraATjwVNNZ3fRV7BFKSiKOVp0?e=qbrCpZ)（`PF818_R5_LIVE_16GB_*.img.gz`，约 2.7GiB）。此包单独通过 OneDrive 分发，无需到 GitHub Releases 查找。
+1. 打开 [OneDrive 下载文件夹](https://1drv.ms/f/c/186e2631aeb25aa5/IgC3XRdvnzqtTa9NNZnPOoe0ATY4-Ukp5VOf0kAp7Uel23Y?e=9RNoSk)，下载文件名带 **`2026-10-26_0233`** 的 `PF818_R5_LIVE_16GB_*.img.gz` 修复版（约 2.7GiB）。此包单独通过 OneDrive 分发，无需到 GitHub Releases 查找。
 2. 解压得到 `.img`；电脑需有约 9GiB 的解压空间。用 balenaEtcher 把该镜像写入 **16GB 或更大的 TF 卡**，等待写入验证完成。
 3. PF818 关机，插入 TF 卡，连接网线，再开机。安装/恢复不需要外接 U 盘。
 4. 直接使用 **`root` / `1234`** 登录。Live 版跳过 Armbian 的首次用户创建流程，也不强制首次改密；登录提示会提醒可用 `passwd` 自行修改。
