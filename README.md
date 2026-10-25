@@ -35,31 +35,38 @@ PF818 收银终端的 Linux 外设适配源码，硬件采用 Rockchip RK3399 / 
 
 ## 下载镜像与获取源码
 
-**Git 源码仓库不包含大镜像文件。小卡版通过 Releases 附件分发，大卡 Live 版通过下表中的 OneDrive 链接下载。** 大卡包是一个完整 `.img.gz`，不分片。安装已发布的系统无需克隆仓库，也不需要自行构建。
+**Git 源码仓库不包含大镜像文件。标准小卡版通过 Releases 附件分发，适合 4GB / 8GB TF 卡；另有大卡完整版，见下方单独说明。** 安装已发布的系统无需克隆仓库，也不需要自行构建。
 
-先按卡容量选择：
-
-| TF 卡容量 | 建议版本 | 是否需要另备 U 盘 |
-| --- | --- | --- |
-| 4GB / 8GB | 原有标准 TF 小卡版 | 手动安装/恢复时，用 U 盘或网络提供系统包 |
-| **16GB 及以上，包括 32GB** | **推荐大卡 Live 安装版** | **不需要：Linux 和安卓两个包已内置** |
-
-可下载的文件如下：
+Releases 中的标准版文件如下：
 
 | 附件 | 用途 |
 | --- | --- |
 | `PF818_R5_TF_*.img.gz` | 写入 TF 卡，用来启动 Linux 和安装/恢复机内系统 |
 | `PF818_R5_EMMC_*.img.gz` | 在 TF 启动的 Linux 中写入 eMMC |
-| `PF818_R5_LIVE_16GB_*.img.gz` | [下载大卡 Live 版（OneDrive，约 2.7GiB）](https://1drv.ms/u/c/186e2631aeb25aa5/IQBmPL5Yu8JpQ6PDKGAOCFraATjwVNNZ3fRV7BFKSiKOVp0?e=qbrCpZ)，适用于 16GB 及以上 TF 卡，内置 Linux 安装与安卓恢复包 |
 | 与镜像同名的 `.img.gz.sha256` | 校验下载的压缩包 |
 | 与镜像同名的 `.img.sha256` | 校验解压后的镜像或写入内容 |
 | 与镜像同名前缀的 `.json` | 查看来源、大小、UUID 和构建验证结果 |
 
-星号代表实际版本、内核和时间戳。小卡版手动安装 eMMC 时，请同时下载其 `.img.gz`、`.img.gz.sha256` 和 `.img.sha256`，放在同一目录。大卡版只需下载 Live 镜像及其校验文件，不必再单独下载两个内置系统包。每个目录只放同一个版本的一套附件。GitHub 自动生成的 **Source code** 压缩包是源码，不是可烧录镜像。
+星号代表实际版本、内核和时间戳。小卡版手动安装 eMMC 时，请同时下载其 `.img.gz`、`.img.gz.sha256` 和 `.img.sha256`，放在同一目录，并通过 U 盘或网络将系统包提供给 PF818。每个目录只放同一个版本的一套附件。GitHub 自动生成的 **Source code** 压缩包是源码，不是可烧录镜像。
 
-标准小卡镜像解压后约 **2577 MiB**，BOOT 128 MiB、ROOTFS 2432 MiB，可写入至少 4GB 的 TF 卡。大卡 Live 镜像压缩后约 **2.7GiB**，解压后约 **8.14GiB**，ROOTFS 已扩为 **8GiB**，需至少 **16GB** TF 卡。两种 TF 版首次启动均保持固定分区；32GB 卡剩余空间不会自动全部分配，但已分配空间足够容纳两个内置包。eMMC 安装版首次从 eMMC 启动时扩容。实际大小和校验值以下载文件的清单为准。
+标准小卡镜像解压后约 **2577 MiB**，BOOT 128 MiB、ROOTFS 2432 MiB，可写入至少 4GB 的 TF 卡。TF 版首次启动保持固定分区；eMMC 安装版首次从 eMMC 启动时扩容。实际大小和校验值以下载文件的清单为准。
 
 镜像继承基础系统登录账户 `root` / `1234`，有线 DHCP，首次使用应修改密码。Wi-Fi 由使用者配置。
+
+### 另：大卡完整版（16GB 及以上）
+
+另有一个更完整的大卡 Live 版本，推荐给使用 **16GB 或更大 TF 卡（包括 32GB）** 的用户。卡内已经放好 **R5 Linux 安装包和样机 Android 7.1.2 恢复包**，可以直接在设备上选择安装 Linux 或恢复安卓，无需另备 U 盘，也不用再单独下载、搬运这两个系统包。原有小卡版继续保留。
+
+**[下载大卡完整版（OneDrive，约 2.7GiB）](https://1drv.ms/u/c/186e2631aeb25aa5/IQBmPL5Yu8JpQ6PDKGAOCFraATjwVNNZ3fRV7BFKSiKOVp0?e=qbrCpZ)**。此包单独通过 OneDrive 分发，不放在 GitHub Releases 中；下载的是一个完整 `.img.gz`，不分片。
+
+简单使用方法：
+
+1. 下载并解压得到 `.img`，用 balenaEtcher 写入 **16GB 及以上 TF 卡**。
+2. PF818 关机，插入 TF 卡，连接路由器网线后开机。从终端登录，或在同一局域网通过 `ssh root@设备实际IP` 连接，账号 **`root`**、密码 **`1234`**。无需创建账号或完成 Armbian 首次初始化，可登录后用 `passwd` 自行改密。
+3. 运行 **`pf818-install`**，先选择 **简体中文 / English**，再选择 **安装 Linux** 或 **恢复安卓**，按提示核对目标并确认写入。此操作会覆盖机内 eMMC 的系统和数据。
+4. 等待写入及校验完成，关机、拔出 TF 卡，再开机即可进入刚安装的机内系统。
+
+镜像解压后约 **8.14GiB**，电脑需留出约 **9GiB** 解压空间；卡内 ROOTFS 为 **8GiB**，已足够容纳两个内置包，32GB 卡的剩余空间不会自动全部分配。详细流程见下文「大卡 Live 安装与恢复」。
 
 ### 自行构建
 
@@ -74,7 +81,7 @@ PF818 收银终端的 Linux 外设适配源码，硬件采用 Rockchip RK3399 / 
 - `adaptation/emmc/`：eMMC 首次启动扩容脚本和服务。
 - `adaptation/build_*.py`：离线镜像打包脚本，使用 `debugfs` 编辑文件系统。
 
-`build/` 和 `output/` 都是构建者本地生成、被 Git 忽略的目录，克隆源码后不会自带这些内容。构建者可用 `--gzip-only --cleanup` 只保留验证后的压缩成品和元数据，再将需要分发的文件单独上传至 Release；安装者直接使用 Release 下载文件即可。
+`build/` 和 `output/` 都是构建者本地生成、被 Git 忽略的目录，克隆源码后不会自带这些内容。构建者可用 `--gzip-only --cleanup` 只保留验证后的压缩成品和元数据，再将标准版成品上传至 Release、大卡完整版上传至 OneDrive；安装者使用对应下载入口即可。
 
 R5 可直接从已有 R4 TF / eMMC 镜像派生，不需要重走 R1–R4。上游镜像、内核、deb、模块成品和原厂 NFC 共享库需自行取得。程序调用见 [USAGE.md](USAGE.md)，变化见 [CHANGELOG.md](CHANGELOG.md)。
 
@@ -152,7 +159,7 @@ LED 支持复用现有内核内建的 `CONFIG_LEDS_GPIO=y` 与 timer trigger，�
 
 ### 1. 写卡并启动
 
-1. 从 [OneDrive 下载大卡 Live 镜像](https://1drv.ms/u/c/186e2631aeb25aa5/IQBmPL5Yu8JpQ6PDKGAOCFraATjwVNNZ3fRV7BFKSiKOVp0?e=qbrCpZ)（`PF818_R5_LIVE_16GB_*.img.gz`，约 2.7GiB），并从对应 Release 附件获取同名 `.img.gz.sha256` 校验文件，按校验文件核对下载内容。
+1. 从 [OneDrive 下载大卡 Live 镜像](https://1drv.ms/u/c/186e2631aeb25aa5/IQBmPL5Yu8JpQ6PDKGAOCFraATjwVNNZ3fRV7BFKSiKOVp0?e=qbrCpZ)（`PF818_R5_LIVE_16GB_*.img.gz`，约 2.7GiB）。此包单独通过 OneDrive 分发，无需到 GitHub Releases 查找。
 2. 解压得到 `.img`；电脑需有约 9GiB 的解压空间。用 balenaEtcher 把该镜像写入 **16GB 或更大的 TF 卡**，等待写入验证完成。
 3. PF818 关机，插入 TF 卡，连接网线，再开机。安装/恢复不需要外接 U 盘。
 4. 直接使用 **`root` / `1234`** 登录。Live 版跳过 Armbian 的首次用户创建流程，也不强制首次改密；登录提示会提醒可用 `passwd` 自行修改。
