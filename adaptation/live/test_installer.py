@@ -135,16 +135,41 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual(error.exception.key, 'source')
 
     def test_release_only_target_mounts_and_swap(self):
-        replies = [json.dumps({'swapdevices': [{'name': '/swap-on-target'}, {'name': '/swap-on-sd'}]}),
-                   '/dev/mmcblk1p2', '/dev/mmcblk0p2',
+        swaps = self.root / 'swaps'
+        swaps.write_text('Filename\tType\tSize\tUsed\tPriority\n'
+                         '/swap\\040on\\040target file 1024 0 -2\n'
+                         '/swap-on-sd file 1024 0 -3\n'
+                         '/dev/zram0 partition 1024 0 5\n')
+        replies = ['/dev/mmcblk1p2', '/dev/mmcblk0p2',
                    json.dumps({'filesystems': [{'source': '/dev/mmcblk0p2', 'target': '/'},
                                                {'source': '/dev/mmcblk1p2', 'target': '/mnt/emmc'}]})]
-        with patch.object(installer, 'target_devices', return_value={Path('/dev/mmcblk1'), Path('/dev/mmcblk1p2')}), \
+        with patch.object(installer, 'PROC_SWAPS', swaps), \
+             patch.object(Path, 'is_block_device', autospec=True, side_effect=lambda p: str(p).startswith('/dev/')), \
+             patch.object(installer, 'target_devices', return_value={Path('/dev/mmcblk1'), Path('/dev/mmcblk1p2')}), \
              patch.object(installer, 'run', side_effect=replies), \
              patch.object(installer.subprocess, 'run') as command:
             installer.release_target(Path('/dev/mmcblk1'))
         self.assertEqual([call.args[0] for call in command.call_args_list],
-                         [['swapoff', '/swap-on-target'], ['umount', '--', '/mnt/emmc']])
+                         [['swapoff', '/swap on target'], ['umount', '--', '/mnt/emmc']])
+
+    def test_proc_swaps_paths_and_escapes(self):
+        swaps = self.root / 'swaps'
+        swaps.write_text('Filename\tType\tSize\tUsed\tPriority\n'
+                         '/dev/mmcblk1p3 partition 1024 0 -2\n'
+                         '/swap\\040with\\011tab\\134040 file 1024 0 -3\n')
+        with patch.object(installer, 'PROC_SWAPS', swaps):
+            self.assertEqual(list(installer.active_swaps()),
+                             [Path('/dev/mmcblk1p3'), Path('/swap with\ttab\\040')])
+
+    def test_release_with_no_swaps_or_target_mounts(self):
+        swaps = self.root / 'swaps'
+        swaps.write_text('Filename\tType\tSize\tUsed\tPriority\n')
+        with patch.object(installer, 'PROC_SWAPS', swaps), \
+             patch.object(installer, 'target_devices', return_value={Path('/dev/mmcblk1')}), \
+             patch.object(installer, 'run', return_value=json.dumps({'filesystems': []})), \
+             patch.object(installer.subprocess, 'run') as command:
+            installer.release_target(Path('/dev/mmcblk1'))
+        command.assert_not_called()
 
     def test_login_hint_and_environment(self):
         script = shlex.quote(str(HERE / 'pf818-live.sh'))

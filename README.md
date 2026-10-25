@@ -1,6 +1,6 @@
 # PF818 Linux 适配
 
-PF818 收银终端的 Linux 外设适配源码，硬件采用 Rockchip RK3399 / SW799 核心板，**底板为 SW7990D Ver1.3**。R5 在已实机验证的 R4 配置上加入独立扫码器、红绿指示灯和摄像头白色补光支持。扫码器已在原厂安卓系统下用静态 ARM64 Linux 程序读出已知二维码，三路灯已逐路点亮并核对实际位置；R5 Armbian 整机启动及 eMMC 安装尚待验证。
+PF818 收银终端的 Linux 外设适配源码，硬件采用 Rockchip RK3399 / SW799 核心板，**底板为 SW7990D Ver1.3**。R5 在已实机验证的 R4 配置上加入独立扫码器、红绿指示灯和摄像头白色补光支持。扫码器已在原厂安卓系统下用静态 ARM64 Linux 程序读出已知二维码，三路灯已逐路点亮并核对实际位置；大卡 Live 版已从 32GB TF 卡启动并通过有线 SSH 登录，Linux 下的扫码、灯控及 eMMC 安装/恢复仍待验收。
 
 基础系统来自 [ophub/amlogic-s9xxx-armbian](https://github.com/ophub/amlogic-s9xxx-armbian)：
 
@@ -17,7 +17,7 @@ PF818 收银终端的 Linux 外设适配源码，硬件采用 Rockchip RK3399 / 
 
 | 外设 | 验证情况（扫码器和灯为 R5 新增，其余沿用 R4） |
 | --- | --- |
-| TF 启动 | 4GB TF 卡启动成功 |
+| TF 启动 | R4 在 4GB TF 卡启动成功；R5 大卡 Live 在 32GB TF 卡启动并通过 SSH 登录 |
 | 有线网口、USB-A | USB `cdc_ether` 网卡 DHCP 与联网通过，USB-A 可用 |
 | 内屏 | DSI0，1200×1920 / 60Hz；fbterm 提供顺时针 90° 横屏登录 |
 | 触摸、六个按钮 | Goodix GT911，触摸、多点及六键事件通过 |
@@ -202,24 +202,28 @@ sudo pf818-install
 
 完成后可在菜单中选择关机，也可返回菜单。**关机后拔出 TF 卡再开机**，才能验证机内 Linux 或安卓；Linux 首次从 eMMC 启动会使用原有扩容服务。
 
-安装器已用临时普通文件模拟写入、损坏镜像、取消操作、目标检查和读回校验；Live 镜像也已完成离线文件系统、GPT、内置包、账号及启动配置检查。**尚未执行 Live TF 的实际启动或通过安装器写入真实 eMMC 的验收。**
+安装器已用临时普通文件模拟写入、损坏镜像、取消操作、目标检查和读回校验；Live 镜像也已完成离线文件系统、GPT、内置包、账号及启动配置检查。大卡 Live 已从 32GB TF 卡实机启动并通过 SSH 登录；修复后的安装器已在该系统通过测试及实际设备的写入前准备检查。**尚未通过安装器写入真实 eMMC 并验收 Linux/安卓启动。**
 
 ## 烧录与恢复：完整操作步骤
 
-以下保留标准小卡版及手动安装方法。使用大卡 Live 版时可直接按上一节操作，无需再搬运包到 U 盘。
+以下是手动安装方法。标准小卡版通过 U 盘提供系统包；大卡 Live 版也可使用这套流程，直接读取卡内已有的包，无需 U 盘。使用大卡版时通常优先选择上一节的 `pf818-install` 菜单。
 
 两种操作都从 **TF 卡上的 Linux** 中完成：
 
 | 要做的事 | 从哪里启动 | 写入哪个文件 | 写到哪里 |
 | --- | --- | --- | --- |
-| 把 R5 Linux 安装到机内 | R5 TF 版 | `PF818_R5_EMMC_*.img.gz` | eMMC 整盘 |
-| 将机内系统恢复为安卓 | Linux TF 卡 | Release 提供的样机安卓整盘备份，或自备整盘原始备份 `.img.gz` | eMMC 整盘 |
+| 把 R5 Linux 安装到机内 | R5 TF 版或大卡 Live 版 | `PF818_R5_EMMC_*.img.gz`，或 Live 内置的 `linux-emmc.img.gz` | eMMC 整盘 |
+| 将机内系统恢复为安卓 | Linux TF 卡 | 样机安卓整盘备份、自备整盘原始备份 `.img.gz`，或 Live 内置的 `android-stock.img.gz` | eMMC 整盘 |
 
 若始终只从 TF 卡运行 Linux，未写过 eMMC，**关机、拔卡、重新开机就能回到原来的安卓**，不需要执行恢复写入。
 
 以下步骤适用于使用 Windows、macOS 或 Linux 电脑下载附件的读者。准备文件可用文件管理器完成；进入 TF 后的刷写命令统一在 **PF818 的 Linux Bash** 中执行。**路径占位符需换成你自己的实际路径；不要求与开发者相同的电脑目录。eMMC 编号和镜像长度从实际设备及文件读取，样机备份的已知校验值只用于对应的恢复附件。**
 
-### 一、准备 TF 卡和存放镜像的 U 盘
+### 一、准备 TF 卡和系统包
+
+**大卡 Live 版：** 按上文写卡并启动即可，两份系统包已内置。跳过本节 U 盘准备，从「二、公共准备」开始执行；其中第 4 步选择大卡版的镜像目录。
+
+**标准小卡版：** 按以下步骤准备 TF 卡及 U 盘。
 
 1. 从所选 Release 下载 TF 版、eMMC 版及对应校验文件。
 2. 准备至少 4GB TF 卡，用于启动 Linux；另准备容量足够的 U 盘，用于存放 eMMC 安装包或安卓恢复备份。R5 安装包可使用至少 4GB 的 U 盘，安卓备份按其实际大小准备空间。U 盘使用 Linux 可读取的 FAT32 或 exFAT；单文件超过 4GiB 时使用 exFAT。更改格式会清空 U 盘，先保存其中的数据。
@@ -245,11 +249,11 @@ sync
 
 只进行其中一种操作时，可以只复制对应的镜像。压缩包无需预先解压到 U 盘，下面会边解压边写入。TF 镜像的根分区固定约 2.4GiB，剩余空间放不下这些安装包；若沿用“预先把镜像放进 TF 根分区”的方法，需要先在更大的 TF 卡上扩展分区。
 
-### 二、公共准备：从 TF 启动，识别 eMMC 并挂载 U 盘
+### 二、公共准备：从 TF 启动，识别 eMMC 并选择镜像目录
 
 #### 1. 从 TF 启动，进入 root Bash
 
-PF818 关机，插入已写好的 TF 卡及 U 盘，再开机进入 Armbian。以下命令全部在 **PF818 的 TF Linux 终端或它的 SSH 会话中** 执行，不是在用于下载附件的电脑上执行。
+PF818 关机，插入已写好的 TF 卡；标准小卡版再插入存有系统包的 U 盘。开机进入 Armbian。以下命令全部在 **PF818 的 TF Linux 终端或它的 SSH 会话中** 执行，不是在用于下载附件的电脑上执行。
 
 基础账户为 `root`，初始密码 `1234`。普通用户先执行：
 
@@ -317,6 +321,8 @@ swapon --show
 
 若有，先用 `swapoff` 关闭该条目。例如输出中的路径为 `/dev/mmcblk1p3`，则执行 `swapoff /dev/mmcblk1p3`；若为交换文件，则执行 `swapoff /实际路径/交换文件`。TF 上的交换和 `/dev/zram*` 无需关闭。
 
+这里使用的 `swapon --show` 已在 Live 真机验证；不要添加 `--json`，镜像自带的 `swapon` 不支持该参数。也可用 `cat /proc/swaps` 查看交换区。
+
 下面只卸载目标 eMMC 上已挂载的设备，若卸载失败会停止：
 
 ```bash
@@ -330,7 +336,18 @@ done < <(lsblk -r -n -p -o NAME "$EMMC_DEV" | tac)
 lsblk -o NAME,SIZE,TYPE,MOUNTPOINTS "$EMMC_DEV"
 ```
 
-#### 4. 挂载存放镜像的 U 盘
+#### 4. 选择镜像目录（两种方式选一种）
+
+**大卡 Live 版：** 使用内置包，执行下面的代码后直接进入「三、安装 R5」或「四、恢复安卓」，不需要执行后面的 U 盘命令：
+
+```bash
+IMAGE_DIR=/opt/pf818-installer/images
+test -d "$IMAGE_DIR"
+test -f "$IMAGE_DIR/../manifest.json"
+ls -lh "$IMAGE_DIR"
+```
+
+**标准小卡版：** 挂载存放镜像的 U 盘：
 
 用 `lsblk` 查看刚插入的 USB 存储分区，按容量、文件系统和 `TRAN` 列区分 U 盘与两种 MMC 介质。将下面的 `/dev/sdX1` 替换为**实际 U 盘分区**，不要求它固定为 `/dev/sda1`，也不要求特定卷标：
 
@@ -369,23 +386,35 @@ ls -lh "$IMAGE_DIR"
 
 ```bash
 cd "$IMAGE_DIR"
-LINUX_FILES=(PF818_R5_EMMC_*.img.gz)
-if [ "${#LINUX_FILES[@]}" -ne 1 ] || [ ! -f "${LINUX_FILES[0]}" ]; then
-    echo "请在此目录只保留所选 Release 的一份 R5 eMMC 压缩镜像。"
-    exit 1
+if [ -f linux-emmc.img.gz ] && [ -f ../manifest.json ]; then
+    # 大卡 Live：从内置清单取得原始镜像校验值。
+    LINUX_IMAGE=linux-emmc.img.gz
+    EXPECTED_LINUX_SHA="$(python3 -c \
+        'import json; print(json.load(open("../manifest.json"))["images"]["linux"]["sha256"])')"
+else
+    # 标准小卡：使用下载的 eMMC 镜像及校验附件。
+    LINUX_FILES=(PF818_R5_EMMC_*.img.gz)
+    if [ "${#LINUX_FILES[@]}" -ne 1 ] || [ ! -f "${LINUX_FILES[0]}" ]; then
+        echo "请在此目录只保留所选 Release 的一份 R5 eMMC 压缩镜像。"
+        exit 1
+    fi
+    LINUX_IMAGE="${LINUX_FILES[0]}"
+    sha256sum -c "$LINUX_IMAGE.sha256"
+    LINUX_RAW_SUM="${LINUX_IMAGE%.gz}.sha256"
+    test -f "$LINUX_RAW_SUM"
+    EXPECTED_LINUX_SHA="$(awk 'NR == 1 {print $1}' "$LINUX_RAW_SUM")"
 fi
-LINUX_IMAGE="${LINUX_FILES[0]}"
-LINUX_RAW_SUM="${LINUX_IMAGE%.gz}.sha256"
 
-sha256sum -c "$LINUX_IMAGE.sha256"
-test -f "$LINUX_RAW_SUM"
 LINUX_BYTES="$(gzip -dc "$LINUX_IMAGE" | wc -c | tr -d '[:space:]')"
 test "$LINUX_BYTES" -gt 0
 test "$EMMC_BYTES" -ge "$LINUX_BYTES"
+ARCHIVE_LINUX_SHA="$(gzip -dc "$LINUX_IMAGE" | sha256sum | awk '{print $1}')"
+test "$ARCHIVE_LINUX_SHA" = "$EXPECTED_LINUX_SHA"
 printf '安装镜像：%s\n解压后长度：%s 字节\n' "$LINUX_IMAGE" "$LINUX_BYTES"
+echo "R5 安装包校验通过。"
 ```
 
-应看到校验结果 `OK`。使用的是 **EMMC 版**，TF 版继续留在卡上作为启动与恢复环境。
+应看到 `R5 安装包校验通过。`，标准小卡版还会显示压缩包校验结果 `OK`。使用的是 **EMMC 安装包**，TF 版继续留在卡上作为启动与恢复环境。
 
 #### 2. 写入 eMMC 整盘
 
@@ -405,7 +434,6 @@ sync
 R5 镜像比 eMMC 容量小，所以只校验刚写入的镜像长度：
 
 ```bash
-EXPECTED_LINUX_SHA="$(awk 'NR == 1 {print $1}' "$IMAGE_DIR/$LINUX_RAW_SUM")"
 ACTUAL_LINUX_SHA="$(head -c "$LINUX_BYTES" "$EMMC_DEV" | sha256sum | awk '{print $1}')"
 printf '镜像校验值：%s\n写入校验值：%s\n' "$EXPECTED_LINUX_SHA" "$ACTUAL_LINUX_SHA"
 test "$ACTUAL_LINUX_SHA" = "$EXPECTED_LINUX_SHA"
@@ -435,11 +463,11 @@ pf818-scan --once --timeout 30
 
 ### 四、进入 TF 后，将 eMMC 刷回原来的安卓
 
-此处适用于 **Linux 已经写入 eMMC** 的情况。设备关机，重新插入 Linux TF 卡及存有备份的 U 盘，开机；先完整执行“二、公共准备”。不要从当前 eMMC 内的系统覆盖它自己。
+此处适用于 **Linux 已经写入 eMMC** 的情况。设备关机，重新插入 Linux TF 卡；标准小卡版还需插入存有备份的 U 盘，大卡 Live 版直接使用内置备份。开机后先完整执行“二、公共准备”。不要从当前 eMMC 内的系统覆盖它自己。
 
 #### 1. 检查原厂备份和目标容量
 
-可以使用 Release 提供的样机安卓 eMMC 用户区整盘原始备份，也可以使用自备的同类 `.img.gz` 文件。下面默认使用项目的样机备份文件名；若选用其他文件，只修改 `ANDROID_IMAGE`。厂商升级包不适用这些整盘写入命令。
+可以使用 Release 提供的样机安卓 eMMC 用户区整盘原始备份、大卡 Live 内置备份，也可以使用自备的同类 `.img.gz` 文件。下面会自动选择 Live 内置包；标准小卡版默认使用项目的样机备份文件名，若选用其他文件，只修改 `ANDROID_IMAGE`。厂商升级包不适用这些整盘写入命令。
 
 项目样机备份 `PF818_Stock_Android_7.1.2_EMMC_2026-10-21_1159.img.gz` 已核对：解压后 **15,634,268,160 字节**，原始镜像 SHA-256 为 `08bc74ae677abdfc928faaab123dee939b6704a0dbc40fe81283c4dda595bb0b`。这些值对应这一份发布附件，不是电脑路径或所有备份的通用参数。
 
@@ -449,6 +477,9 @@ pf818-scan --once --timeout 30
 ANDROID_IMAGE="PF818_Stock_Android_7.1.2_EMMC_2026-10-21_1159.img.gz"
 # 若使用其他整盘原始备份，将上面的值改成实际文件名。
 cd "$IMAGE_DIR"
+if [ -f android-stock.img.gz ] && [ -f ../manifest.json ]; then
+    ANDROID_IMAGE=android-stock.img.gz
+fi
 test -f "$ANDROID_IMAGE"
 if [ -f "$ANDROID_IMAGE.sha256" ]; then
     sha256sum -c "$ANDROID_IMAGE.sha256"
@@ -457,7 +488,9 @@ fi
 python3 - "$ANDROID_IMAGE" > /tmp/pf818-android-restore-meta.txt <<'PY'
 import gzip
 import hashlib
+import json
 import sys
+from pathlib import Path
 
 size = 0
 digest = hashlib.sha256()
@@ -465,6 +498,10 @@ with gzip.open(sys.argv[1], "rb") as backup:
     while chunk := backup.read(16 * 1024 * 1024):
         size += len(chunk)
         digest.update(chunk)
+if sys.argv[1] == "android-stock.img.gz":
+    entry = json.loads(Path("../manifest.json").read_text())["images"]["android"]
+    if size != entry["bytes"] or digest.hexdigest() != entry["sha256"]:
+        raise SystemExit("Live 内置安卓包与清单不符，停止恢复。")
 print(size, digest.hexdigest())
 PY
 
@@ -524,7 +561,7 @@ eMMC 的 `boot0`、`boot1` 是独立硬件启动区，不是安卓名为 `boot` 
 
 ### 五、当前验证范围与恢复入口
 
-项目当前已完成开发样机上的扫码器安卓接口验证、三路灯点亮及位置确认、R5 镜像离线检查，以及样机安卓恢复附件的完整性/容量/关键引导区域核对。**R5 TF 冷启动、灯控与扫码的 Armbian 启动后验证、eMMC 安装/独立启动、实际安卓回刷启动尚未执行验收。** 下载后仍按上面的命令检查附件和写入内容。
+项目当前已完成开发样机上的扫码器安卓接口验证、三路灯点亮及位置确认、R5 镜像离线检查、大卡 Live 的 32GB TF 启动与 SSH 登录，以及样机安卓恢复附件的完整性/容量/关键引导区域核对。**灯控与扫码的 Armbian 启动后验证、eMMC 安装/独立启动、实际安卓回刷启动尚未执行验收。** 下载后仍按上面的命令检查附件和写入内容。
 
 如果 TF 卡也无法启动，需要转用 Rockchip Loader / MaskROM USB 恢复。PF818 的具体恢复入口及匹配的 DDR/USB Loader 目前尚未验证；该路径不在上面的 TF 恢复命令中。相关文件说明见 [RESTORING_ANDROID.md](RESTORING_ANDROID.md)，驱动和工具来源见 [NOTICE.md](NOTICE.md)。
 

@@ -17,6 +17,7 @@ import time
 BUNDLE = Path('/opt/pf818-installer')
 SYS_BLOCK = Path('/sys/class/block')
 COMPATIBLE = Path('/proc/device-tree/compatible')
+PROC_SWAPS = Path('/proc/swaps')
 LANG = 'en'
 TEXT = {
     'title': ('PF818 Live 系统安装与恢复', 'PF818 Live system installation and recovery'),
@@ -183,11 +184,18 @@ def verify_archive(path, expected_size, expected_hash, report):
         raise InstallError('hash')
 
 
+def active_swaps():
+    # /proc/swaps is available on Linux without relying on swapon output options.
+    # The kernel escapes spaces, tabs, newlines and backslashes as octal sequences.
+    for line in PROC_SWAPS.read_text().splitlines()[1:]:
+        if line.strip():
+            name = re.sub(r'\\([0-7]{3})', lambda match: chr(int(match[1], 8)), line.split()[0])
+            yield Path(name)
+
+
 def release_target(target):
     devices = target_devices(target)
-    swaps = json.loads(run(['swapon', '--show', '--json', '--output', 'NAME']))
-    for entry in swaps.get('swapdevices', []):
-        swap = Path(entry['name'])
+    for swap in active_swaps():
         backing = swap.resolve() if swap.is_block_device() else Path(
             run(['findmnt', '-n', '-o', 'SOURCE', '-T', swap])).resolve()
         if backing in devices:
